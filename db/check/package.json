@@ -1,0 +1,12 @@
+{
+  "name": "stitchflow-db-check",
+  "private": true,
+  "type": "module",
+  "description": "Applies the migrations and views to a throwaway Postgres and checks the rules hold.",
+  "scripts": {
+    "check": "node check-schema.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

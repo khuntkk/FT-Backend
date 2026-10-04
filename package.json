@@ -1,0 +1,20 @@
+{
+  "name": "stitchflow-platform",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "contract",
+    "api",
+    "db/check"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w api",
+    "start": "npm start -w api",
+    "migrate": "npm run migrate -w api",
+    "typecheck": "npm run typecheck -w api",
+    "test": "npm run check -w db/check && npm test -w contract && npm test -w api"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

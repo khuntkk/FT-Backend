@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Schema rules (db/check)
+        run: npm run check -w db/check
+      - name: Contract tests
+        run: npm test -w contract
+      - name: API typecheck
+        run: npm run typecheck -w api
+      - name: API tests
+        run: npm test -w api

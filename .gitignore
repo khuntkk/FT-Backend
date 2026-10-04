@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# StitchFlow
+!.env.example
+# The contract's build is committed, so the API runs without building it first.
+!contract/dist/
+# Uploaded files in development
+var/

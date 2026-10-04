@@ -1,0 +1,827 @@
+import type { ActionKey, ModuleKey } from './catalog.js';
+import type { ErrorCode } from './errors.js';
+export type { ActionKey, ModuleKey, ErrorCode };
+/** A calendar date with no time: "YYYY-MM-DD". */
+export type DateOnly = string;
+/** An instant, ISO-8601 UTC: "2026-09-27T09:30:00Z". */
+export type Instant = string;
+/** A calendar month: "YYYY-MM". */
+export type Month = string;
+/** `karigar` is shown as Operator. */
+export type StaffCategory = "karigar" | "supervisor" | "designer" | "otherStaff";
+export declare const StaffCategoryValues: readonly ["karigar", "supervisor", "designer", "otherStaff"];
+export type AttendanceStatus = "present" | "halfDay" | "absent";
+export declare const AttendanceStatusValues: readonly ["present", "halfDay", "absent"];
+export type PayMode = "cash" | "bank";
+export declare const PayModeValues: readonly ["cash", "bank"];
+export type PayrollStatus = "draft" | "approved" | "paid";
+export declare const PayrollStatusValues: readonly ["draft", "approved", "paid"];
+/** The five fixed roles. `worker` is shown as Operator. */
+export type UserRole = "superAdmin" | "admin" | "viewAdmin" | "supervisor" | "worker";
+export declare const UserRoleValues: readonly ["superAdmin", "admin", "viewAdmin", "supervisor", "worker"];
+export type BonusCondition = "fullHead" | "headLoss";
+export declare const BonusConditionValues: readonly ["fullHead", "headLoss"];
+export type BonusKind = "perThousandSlab" | "fixedSlab" | "flatPlusSlab" | "perFrame";
+export declare const BonusKindValues: readonly ["perThousandSlab", "fixedSlab", "flatPlusSlab", "perFrame"];
+export type ShiftScheme = "dayNight" | "threeShift" | "manual";
+export declare const ShiftSchemeValues: readonly ["dayNight", "threeShift", "manual"];
+export type DeletedKind = "machine" | "staff" | "productionEntry" | "upad" | "salaryPayment" | "bonusRule" | "attendance";
+export declare const DeletedKindValues: readonly ["machine", "staff", "productionEntry", "upad", "salaryPayment", "bonusRule", "attendance"];
+export type RestoreProblem = "parentDeleted" | "machineNumberTaken" | "periodAlreadyPaid";
+export declare const RestoreProblemValues: readonly ["parentDeleted", "machineNumberTaken", "periodAlreadyPaid"];
+export type FilePurpose = "machinePhoto" | "staffPhoto" | "slipPhoto";
+export declare const FilePurposeValues: readonly ["machinePhoto", "staffPhoto", "slipPhoto"];
+export type ClientKind = "managerApp" | "crewApp" | "webAdmin";
+export declare const ClientKindValues: readonly ["managerApp", "crewApp", "webAdmin"];
+/** none < view < edit. */
+export type AccessLevel = "none" | "view" | "edit";
+export declare const AccessLevelValues: readonly ["none", "view", "edit"];
+export type AccountStatus = "active" | "disabled";
+export declare const AccountStatusValues: readonly ["active", "disabled"];
+export type PropertyStatus = "active" | "suspended" | "closed";
+export declare const PropertyStatusValues: readonly ["active", "suspended", "closed"];
+export type PlatformRole = "admin" | "support";
+export declare const PlatformRoleValues: readonly ["admin", "support"];
+export type ScanEngine = "mlkitLatin" | "server";
+export declare const ScanEngineValues: readonly ["mlkitLatin", "server"];
+export type SlipField = "totalStitches" | "designStitches" | "threadBreaks" | "embMinutes" | "stopMinutes" | "frames" | "designNo" | "designName";
+export declare const SlipFieldValues: readonly ["totalStitches", "designStitches", "threadBreaks", "embMinutes", "stopMinutes", "frames", "designNo", "designName"];
+export type AuthFailureReason = "noSuchUser" | "wrongPassword" | "tooShort" | "demoPassword";
+export declare const AuthFailureReasonValues: readonly ["noSuchUser", "wrongPassword", "tooShort", "demoPassword"];
+export type ShiftProblemKind = "empty" | "noLength" | "longerThanDay" | "startsOutsideDay" | "totalOverDay" | "overlap" | "runsPastStart";
+export declare const ShiftProblemKindValues: readonly ["empty", "noLength", "longerThanDay", "startsOutsideDay", "totalOverDay", "overlap", "runsPastStart"];
+export type SlabProblemKind = "empty" | "inverted" | "openEndedNotLast" | "overlap" | "gap";
+export declare const SlabProblemKindValues: readonly ["empty", "inverted", "openEndedNotLast", "overlap", "gap"];
+/** One customer's unit — the tenant. */
+export interface Property {
+    /** Server-issued id. */
+    id: number;
+    /** Short handle, e.g. "janki-creation". */
+    code: string;
+    name: string;
+    /** IANA zone; "today" is this zone's date. */
+    timezone: string;
+    status: PropertyStatus;
+    /** Most machines the unit may have. Set from the web admin panel only. */
+    machineLimit: number;
+    createdAt: Instant;
+}
+export interface PropertySettings {
+    businessName: string;
+    currencySymbol: string;
+    shiftScheme: ShiftScheme;
+    dayStartMinute: number;
+    /** Rupees, two decimals. */
+    noLeaveBonusAmount: number;
+    stitchBasedEnabled: boolean;
+    /** Up to four decimals. */
+    stitchBasedRatePerThousand: number;
+    timezone: string;
+}
+/** A person who can sign in. Never carries a password hash. */
+export interface User {
+    /** Server-issued id. */
+    id: number;
+    displayName: string;
+    username: string | null;
+    /** E.164, e.g. "+919812345678". */
+    phone: string | null;
+    email: string | null;
+    status: AccountStatus;
+    mustChangePassword: boolean;
+    lastLoginAt: Instant | null;
+}
+export interface Membership {
+    /** Server-issued id. */
+    memberId: number;
+    /** Server-issued id. */
+    propertyId: number;
+    propertyCode: string;
+    propertyName: string;
+    role: UserRole;
+    isOwner: boolean;
+    status: AccountStatus;
+}
+export interface ModuleAccess {
+    module: ModuleKey;
+    level: AccessLevel;
+}
+/** A user's place in a property. */
+export interface Member {
+    /** Server-issued id. */
+    id: number;
+    /** Server-issued id. */
+    userId: number;
+    displayName: string;
+    role: UserRole;
+    /** The property's main super admin. */
+    isOwner: boolean;
+    status: AccountStatus;
+    /** The roster row this login is, if any. */
+    staffId: number | null;
+    modules: ModuleAccess[];
+    createdAt: Instant;
+}
+export interface Me {
+    user: User;
+    member: Member;
+    property: Property;
+    settings: PropertySettings;
+    /** Gate every screen on this list. */
+    modules: ModuleAccess[];
+}
+export interface Machine {
+    /** Server-issued id. */
+    id: number;
+    /** The painted number; unique among live machines. */
+    number: number;
+    name: string | null;
+    isActive: boolean;
+    photoFileId: string | null;
+    model: string | null;
+    heads: number | null;
+    needles: number | null;
+    location: string | null;
+    serialNo: string | null;
+    createdAt: Instant;
+    updatedAt: Instant;
+}
+/** A person on the roster. Carries pay: supervisors never receive this shape. */
+export interface Staff {
+    /** Server-issued id. */
+    id: number;
+    code: string | null;
+    name: string;
+    phone: string | null;
+    category: StaffCategory;
+    subcategory: string | null;
+    /** Rupees, two decimals. */
+    monthlySalary: number;
+    /** Salary is divided by this for a day rate: 30 in the trade. */
+    payDaysPerMonth: number;
+    cutSalaryForAbsentDays: boolean;
+    allowHalfDay: boolean;
+    joinedOn: DateOnly | null;
+    leftOn: DateOnly | null;
+    isActive: boolean;
+    notes: string | null;
+    photoFileId: string | null;
+    createdAt: Instant;
+    updatedAt: Instant;
+}
+/** A person without pay, for pickers and attendance — what a supervisor may see. */
+export interface Person {
+    /** Server-issued id. */
+    id: number;
+    name: string;
+    code: string | null;
+    category: StaffCategory;
+    photoFileId: string | null;
+    isActive: boolean;
+}
+/** One version of a shift. Editing opens a new version from a date. */
+export interface Shift {
+    /** This version. */
+    id: number;
+    /** The shift all its versions belong to; equals id for a first version. */
+    lineageId: number;
+    name: string;
+    startMinute: number;
+    /** 1–1440. */
+    durationMinutes: number;
+    sortOrder: number;
+    /** Inclusive. */
+    effectiveFrom: DateOnly;
+    /** Exclusive; null while current. */
+    effectiveTo: DateOnly | null;
+}
+export interface ProductionEntry {
+    /** Server-issued id. */
+    id: number;
+    /** Server-issued id. */
+    machineId: number;
+    workDate: DateOnly;
+    /** A shift version in effect on workDate. */
+    shiftId: number;
+    totalStitches: number;
+    embMinutes: number;
+    stopMinutes: number;
+    threadBreaks: number;
+    frames: number;
+    designNo: string | null;
+    designName: string | null;
+    designStitches: number | null;
+    hasHeadLoss: boolean;
+    /** Second machine: stitch-based rate, no attendance. */
+    isStitchBased: boolean;
+    /** The whole machine's bonus, split between its operators. */
+    bonusAmount: number;
+    bonusIsManual: boolean;
+    note: string | null;
+    slipPhotoFileId: string | null;
+    createdAt: Instant;
+    updatedAt: Instant;
+}
+export interface EntryKarigar {
+    staff: Person;
+    isHalfDay: boolean;
+}
+export interface EntryWithKarigars {
+    entry: ProductionEntry;
+    karigars: EntryKarigar[];
+    /** Rupees, two decimals. */
+    bonusPerKarigar: number;
+}
+export interface MachineDay {
+    machine: Machine;
+    entry: EntryWithKarigars | null;
+}
+export interface ProductionTotals {
+    stitches: number;
+    embMinutes: number;
+    stopMinutes: number;
+    threadBreaks: number;
+    frames: number;
+    entryCount: number;
+    machineCount: number;
+    shiftMinutes: number;
+    /** Emb time over shift time, 0–1; null with no shift to measure. */
+    utilisation: number | null;
+    accountedFor: number | null;
+    averagePerEntry: number;
+}
+/** One recognised line of a report photo, with its box in the image. */
+export interface OcrLine {
+    text: string;
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+}
+/** What to save for one machine, date and shift. Upserts. */
+export interface EntryDraft {
+    /** Server-issued id. */
+    machineId: number;
+    workDate: DateOnly;
+    /** Server-issued id. */
+    shiftId: number;
+    totalStitches: number;
+    embMinutes: number;
+    stopMinutes: number;
+    threadBreaks: number;
+    frames: number;
+    designNo?: string | null;
+    designName?: string | null;
+    designStitches?: number | null;
+    hasHeadLoss: boolean;
+    isStitchBased: boolean;
+    /** A preview unless bonusIsManual: the server works it out. */
+    bonusAmount: number;
+    bonusIsManual: boolean;
+    note?: string | null;
+    slipPhotoFileId?: string | null;
+    /** The report scan that filled this slip. */
+    scanId?: number | null;
+    karigars: KarigarOnEntry[];
+}
+export interface KarigarOnEntry {
+    /** Server-issued id. */
+    staffId: number;
+    isHalfDay: boolean;
+}
+export interface ScanInput {
+    /** Server-issued id. */
+    machineId: number;
+    photoFileId: string;
+    engine: ScanEngine;
+    lines: OcrLine[];
+    /** { field: { value, confidence, source } } as readSlip() produced it. */
+    reading: Record<string, unknown>;
+}
+export interface HajariDay {
+    date: DateOnly;
+    /** Null when unmarked. */
+    status: AttendanceStatus | null;
+    /** Credited by running a machine rather than marked by hand. */
+    fromProduction: boolean;
+}
+export interface StaffHajari {
+    staff: Person;
+    day: HajariDay;
+}
+export interface AttendanceDay {
+    present: number;
+    halfDay: number;
+    absent: number;
+    unmarked: number;
+}
+export interface MarkInput {
+    /** Server-issued id. */
+    staffId: number;
+    date: DateOnly;
+    status: AttendanceStatus;
+}
+export interface MarkManyInput {
+    /** Server-issued id. */
+    staffId: number;
+    dates: DateOnly[];
+    status: AttendanceStatus;
+}
+export interface MarkAllInput {
+    staffIds: number[];
+    date: DateOnly;
+    status: AttendanceStatus;
+}
+export interface UndoMarkAllInput {
+    staffIds: number[];
+    date: DateOnly;
+}
+export interface ClearMonthInput {
+    /** Server-issued id. */
+    staffId: number;
+    month: Month;
+}
+export interface Advance {
+    /** Server-issued id. */
+    id: number;
+    /** Server-issued id. */
+    staffId: number;
+    givenOn: DateOnly;
+    /** Rupees, two decimals. */
+    amount: number;
+    mode: PayMode;
+    note: string | null;
+    createdAt: Instant;
+}
+export interface AdvanceInput {
+    /** Server-issued id. */
+    staffId: number;
+    givenOn: DateOnly;
+    /** Greater than 0. */
+    amount: number;
+    mode: PayMode;
+    note?: string | null;
+}
+export interface AdvanceBalance {
+    /** Given before the month ends, less what earlier paid payslips recovered. */
+    owedGoingIn: number;
+    /** Rupees, two decimals. */
+    givenInMonth: number;
+}
+export interface SalaryBreakdown {
+    /** Up to four decimals. */
+    perDayRate: number;
+    /** Half days count 0.5. */
+    daysWorked: number;
+    /** Rupees, two decimals. */
+    baseAmount: number;
+    /** Rupees, two decimals. */
+    bonusAmount: number;
+    /** Rupees, two decimals. */
+    noLeaveBonus: number;
+    /** Rupees, two decimals. */
+    advanceDeducted: number;
+    /** Rupees, two decimals. */
+    otherDeductions: number;
+    /** Never below zero. */
+    netPayable: number;
+    salaryWasCut: boolean;
+}
+/** A payslip: a snapshot, so a paid month stays what was paid. */
+export interface SalaryPayment {
+    /** Server-issued id. */
+    id: number;
+    /** Server-issued id. */
+    staffId: number;
+    /** Inclusive; the first of the month. */
+    periodStart: DateOnly;
+    /** Exclusive. */
+    periodEnd: DateOnly;
+    daysWorked: number;
+    /** Up to four decimals. */
+    perDayRate: number;
+    stitchesInPeriod: number;
+    /** Rupees, two decimals. */
+    baseAmount: number;
+    /** Rupees, two decimals. */
+    bonusAmount: number;
+    /** Rupees, two decimals. */
+    noLeaveBonus: number;
+    salaryWasCut: boolean;
+    /** Rupees, two decimals. */
+    advanceDeducted: number;
+    /** Rupees, two decimals. */
+    otherDeductions: number;
+    /** Rupees, two decimals. */
+    netPayable: number;
+    /** Rupees, two decimals. */
+    paidAmount: number;
+    status: PayrollStatus;
+    paidOn: Instant | null;
+    note: string | null;
+}
+export interface PayrollRow {
+    staff: Staff;
+    /** From the payslip when paid; worked out now otherwise. */
+    breakdown: SalaryBreakdown;
+    /** Owed going into this month. */
+    outstandingAdvance: number;
+    /** Rupees, two decimals. */
+    advanceLeftAfter: number;
+    /** Rupees, two decimals. */
+    upadThisMonth: number;
+    stitches: number;
+    payment: SalaryPayment | null;
+}
+/** Mark a month paid. The server computes the snapshot; it takes no figures from the client. */
+export interface PayslipInput {
+    /** Server-issued id. */
+    staffId: number;
+    month: Month;
+    /** Rupees, two decimals. */
+    otherDeductions?: number;
+    note?: string | null;
+}
+export interface BonusSlab {
+    /** Server-issued id. */
+    id: number;
+    /** Inclusive. */
+    fromStitches: number;
+    /** Exclusive; null for the open top band. */
+    toStitches: number | null;
+    /** ₹ per 1,000 stitches, or a flat ₹, by the rule's kind. */
+    value: number;
+}
+export interface BonusRule {
+    /** Server-issued id. */
+    id: number;
+    name: string;
+    isActive: boolean;
+    condition: BonusCondition;
+    kind: BonusKind;
+    /** Rupees, two decimals. */
+    flatAmount: number;
+    /** Up to four decimals. */
+    ratePerFrame: number;
+    sortOrder: number;
+    slabs: BonusSlab[];
+}
+export interface SlabInput {
+    fromStitches: number;
+    toStitches: number | null;
+    /** Up to four decimals. */
+    value: number;
+}
+export interface BonusRuleInput {
+    name: string;
+    isActive: boolean;
+    condition: BonusCondition;
+    kind: BonusKind;
+    /** Rupees, two decimals. */
+    flatAmount?: number;
+    /** Up to four decimals. */
+    ratePerFrame?: number;
+    sortOrder?: number;
+    slabs: SlabInput[];
+}
+export interface BonusRuleToggle {
+    isActive: boolean;
+}
+export interface SchemeInput {
+    scheme: ShiftScheme;
+    dayStartMinute: number;
+}
+export interface ShiftInput {
+    name: string;
+    startMinute: number;
+    durationMinutes: number;
+    sortOrder?: number;
+}
+export interface ShiftPatch {
+    name?: string;
+    startMinute?: number;
+    durationMinutes?: number;
+    sortOrder?: number;
+}
+export interface ShiftTiming {
+    /** Server-issued id. */
+    id: number;
+    startMinute: number;
+    durationMinutes: number;
+}
+/** Smart Adjust: applied together. */
+export interface TimingsInput {
+    shifts: ShiftTiming[];
+}
+export interface ShiftSnapshot {
+    /** Server-issued id. */
+    id: number;
+    name: string;
+    startMinute: number;
+    durationMinutes: number;
+}
+/** Undo to a known-good set. */
+export interface RestoreShiftsInput {
+    shifts: ShiftSnapshot[];
+}
+export interface DateResult {
+    date: DateOnly;
+}
+export interface ShiftProblem {
+    kind: ShiftProblemKind;
+    /** A name the unit typed; never translated. */
+    shift: string | null;
+    other: string | null;
+}
+export interface SlabProblem {
+    kind: SlabProblemKind;
+    fromStitches: number | null;
+    toStitches: number | null;
+    nextFromStitches: number | null;
+    nextToStitches: number | null;
+}
+/** The facts, not sentences: the client words them in its language. */
+export interface DeletedItem {
+    kind: DeletedKind;
+    /** For attendance, the lowest id of the cleared month. */
+    id: number;
+    deletedAt: Instant;
+    expiresAt: Instant;
+    /** What the unit called it; never translated. */
+    name: string | null;
+    machineNumber: number | null;
+    category: StaffCategory | null;
+    code: string | null;
+    date: DateOnly | null;
+    shiftName: string | null;
+    stitches: number | null;
+    payMode: PayMode | null;
+    condition: BonusCondition | null;
+    bonusKind: BonusKind | null;
+    /** Rupees, two decimals. */
+    amount: number | null;
+    /** Rows that come back with it; for attendance, days. */
+    childCount: number;
+}
+export interface CreateUserInput {
+    displayName: string;
+    phone?: string | null;
+    email?: string | null;
+    username?: string | null;
+    role: UserRole;
+    /** Selected modules. Each within the creator's own level and the role's ceiling. */
+    modules?: Partial<Record<ModuleKey, AccessLevel>>;
+    /** Server-issued id. */
+    staffId?: number | null;
+}
+export interface CreatedUser {
+    member: Member;
+    /** Shown once. Must be changed at first sign-in. */
+    temporaryPassword: string;
+}
+export interface AccessPatch {
+    modules: Partial<Record<ModuleKey, AccessLevel>>;
+}
+export interface TemporaryPassword {
+    temporaryPassword: string;
+}
+export interface TransferOwnershipInput {
+    /** Server-issued id. */
+    toMemberId: number;
+}
+export interface LoginInput {
+    /** Phone (E.164), email or username. */
+    identifier: string;
+    password: string;
+    client: ClientKind;
+    /** 15 days instead of 7. */
+    keepSignedIn: boolean;
+}
+export interface LoginResult {
+    /** JWT, 15 minutes. */
+    accessToken: string;
+    /** Opaque. Rotates on every use. Keep it in the platform keystore. */
+    refreshToken: string;
+    /** Seconds. */
+    expiresIn: number;
+    user: User;
+    memberships: Membership[];
+    activeMember: Membership | null;
+}
+export interface TokenPair {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+}
+export interface SelectPropertyInput {
+    /** Server-issued id. */
+    memberId: number;
+}
+export interface RefreshInput {
+    refreshToken: string;
+}
+export interface ChangePasswordInput {
+    current: string;
+    /** At least 8 characters, not the demo password. */
+    next: string;
+}
+/** The shift arrangement and day start go through /shifts/scheme. */
+export interface SettingsPatch {
+    businessName?: string;
+    currencySymbol?: string;
+    /** Rupees, two decimals. */
+    noLeaveBonusAmount?: number;
+    stitchBasedEnabled?: boolean;
+    /** Up to four decimals. */
+    stitchBasedRatePerThousand?: number;
+}
+export interface ResetDataInput {
+    confirmPropertyCode: string;
+}
+export interface MachineInput {
+    number: number;
+    name?: string | null;
+}
+export interface BulkMachinesInput {
+    /** Creates the missing numbers 1..upTo. */
+    upTo: number;
+}
+export interface BulkCreated {
+    created: number;
+}
+/** How many machines the unit may have, has, and has left. */
+export interface MachineAllowance {
+    limit: number;
+    /** Every machine not in the recycle bin, active or not. */
+    used: number;
+    /** At 0, adding or restoring a machine is refused: turn "Add machine" off. */
+    left: number;
+}
+/** Any subset; null clears. */
+export interface MachinePatch {
+    number?: number;
+    name?: string | null;
+    isActive?: boolean;
+    photoFileId?: string | null;
+    model?: string | null;
+    heads?: number | null;
+    needles?: number | null;
+    location?: string | null;
+    serialNo?: string | null;
+}
+export interface StaffInput {
+    code?: string | null;
+    name: string;
+    phone?: string | null;
+    category: StaffCategory;
+    subcategory?: string | null;
+    /** Rupees, two decimals. */
+    monthlySalary: number;
+    payDaysPerMonth?: number;
+    cutSalaryForAbsentDays?: boolean;
+    allowHalfDay?: boolean;
+    joinedOn?: DateOnly | null;
+    leftOn?: DateOnly | null;
+    isActive?: boolean;
+    notes?: string | null;
+    photoFileId?: string | null;
+}
+export interface StaffPatch {
+    code?: string | null;
+    name?: string;
+    phone?: string | null;
+    category?: StaffCategory;
+    subcategory?: string | null;
+    /** Rupees, two decimals. */
+    monthlySalary?: number;
+    payDaysPerMonth?: number;
+    cutSalaryForAbsentDays?: boolean;
+    allowHalfDay?: boolean;
+    joinedOn?: DateOnly | null;
+    leftOn?: DateOnly | null;
+    isActive?: boolean;
+    notes?: string | null;
+    photoFileId?: string | null;
+}
+export interface NextCode {
+    code: string;
+}
+export interface CreatedId {
+    /** Server-issued id. */
+    id: number;
+}
+export interface FileRef {
+    id: string;
+    purpose: FilePurpose;
+    /** Short-lived signed URL. */
+    url: string;
+    width: number | null;
+    height: number | null;
+}
+export interface AuditEntry {
+    /** Server-issued id. */
+    id: number;
+    occurredAt: Instant;
+    /** Server-issued id. */
+    propertyId: number | null;
+    /** Server-issued id. */
+    actorUserId: number | null;
+    /** Server-issued id. */
+    actorMemberId: number | null;
+    actorPlatformRole: PlatformRole | null;
+    action: string;
+    entityType: string;
+    entityId: string | null;
+    destructive: boolean;
+    before: unknown;
+    after: unknown;
+    requestId: string | null;
+}
+export interface EntryPage {
+    items: EntryWithKarigars[];
+    nextCursor: string | null;
+}
+export interface AuditPage {
+    items: AuditEntry[];
+    nextCursor: string | null;
+}
+export interface ApiError {
+    error: ApiErrorBody;
+}
+export interface ApiErrorBody {
+    code: ErrorCode;
+    /** English, for logs. Clients word `code` in the user's language. */
+    message: string;
+    details?: Record<string, unknown>;
+}
+export interface PlatformLoginInput {
+    email: string;
+    password: string;
+}
+export interface OwnerInput {
+    displayName: string;
+    phone: string;
+    email?: string | null;
+}
+export interface CreatePropertyInput {
+    code: string;
+    name: string;
+    timezone?: string;
+    /** 0 to 9999. */
+    machineLimit: number;
+    owner: OwnerInput;
+}
+export interface CreatedProperty {
+    property: Property;
+    owner: Member;
+    /** The owner's, shown once. */
+    temporaryPassword: string;
+}
+export interface PropertyPatch {
+    name?: string;
+    timezone?: string;
+    status?: PropertyStatus;
+    /** Lowering it below the machines the unit has removes nothing; it only stops adding. */
+    machineLimit?: number;
+}
+export interface PropertySummary {
+    /** Server-issued id. */
+    id: number;
+    code: string;
+    name: string;
+    status: PropertyStatus;
+    memberCount: number;
+    machineLimit: number;
+    machineCount: number;
+    lastActivityAt: Instant | null;
+}
+export interface PropertyDetail {
+    property: Property;
+    settings: PropertySettings;
+    members: Member[];
+    machineCount: number;
+    staffCount: number;
+}
+export interface PlatformUser {
+    user: User;
+    memberships: Membership[];
+    liveSessions: number;
+}
+export interface PlatformStaffMember {
+    /** Server-issued id. */
+    userId: number;
+    displayName: string;
+    email: string | null;
+    role: PlatformRole;
+}
+export interface PlatformStaffInput {
+    displayName: string;
+    email: string;
+    role: PlatformRole;
+}
+export interface CreatedPlatformStaff {
+    staff: PlatformStaffMember;
+    /** Shown once. */
+    temporaryPassword: string;
+}
+//# sourceMappingURL=types.d.ts.map

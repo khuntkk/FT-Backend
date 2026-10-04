@@ -1,0 +1,32 @@
+{
+  "name": "@stitchflow/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The StitchFlow API: the apps' /v1 and the web admin panel's /v1/platform.",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/server.ts",
+    "start": "node --env-file-if-exists=../.env src/server.ts",
+    "migrate": "node --env-file-if-exists=../.env src/db/migrate.ts",
+    "purge": "node --env-file-if-exists=../.env src/jobs/run.ts",
+    "create-platform-admin": "node --env-file-if-exists=../.env src/jobs/createPlatformAdmin.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\""
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^10.1.2",
+    "@node-rs/argon2": "^2.2.1",
+    "@stitchflow/contract": "^1.1.0",
+    "fastify": "^5.12.5",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
+    "typescript": "~5.9"
+  }
+}
