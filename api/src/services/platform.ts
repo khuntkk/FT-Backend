@@ -369,7 +369,8 @@ export async function listAudit(tx: Tx, q: AuditQuery): Promise<AuditPage> {
 // --- Our console staff --------------------------------------------------------
 
 const STAFF_SQL = `
-  select ps.user_id as "userId", u.display_name as "displayName", u.email::text as email, ps.role
+  select ps.user_id as "userId", u.display_name as "displayName", u.email::text as email, ps.role,
+         ps.totp_enabled_at is not null as "totpEnabled"
   from platform_staff ps join users u on u.id = ps.user_id`;
 
 export function listStaff(tx: Tx): Promise<PlatformStaffMember[]> {

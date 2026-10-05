@@ -16,6 +16,7 @@ import type { UserRole } from '@stitchflow/contract';
 import { buildApp } from '../src/app.ts';
 import { dbFrom, PARSERS, type Connection } from '../src/db/db.ts';
 import { EventBus } from '../src/http/events.ts';
+import type { Storage } from '../src/storage/storage.ts';
 import { migrate } from '../src/db/migrate.ts';
 import { hashPassword } from '../src/auth/passwords.ts';
 import { signInByIdentifier, signInByIp } from '../src/services/rateLimit.ts';
@@ -53,7 +54,7 @@ function sessionLock(pglite: PGlite) {
   };
 }
 
-export async function startHarness(): Promise<Harness> {
+export async function startHarness(opts: { storage?: Storage } = {}): Promise<Harness> {
   const pglite = await PGlite.create({ extensions: { btree_gist, citext }, parsers: PARSERS });
   await pglite.exec(`set time zone 'UTC'`);
   const acquire = sessionLock(pglite);
@@ -69,9 +70,10 @@ export async function startHarness(): Promise<Harness> {
   const app = await buildApp({
     db,
     events,
+    storage: opts.storage,
     config: {
       port: 0, host: '127.0.0.1', databaseUrl: 'pglite', platformDatabaseUrl: 'pglite',
-      jwtSecret: 'test-secret-test-secret-test-secret!', filesDir, runJobs: false,
+      jwtSecret: 'test-secret-test-secret-test-secret!', filesDir, supabase: null, runJobs: false,
       logLevel: 'silent', trustProxy: false,
     },
   });

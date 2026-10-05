@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "StitchFlow API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "The contract between the StitchFlow apps, the web admin panel and the API. Every operation names the permission action it needs (x-action); a destructive action is super admin only. Dates without a time are \"YYYY-MM-DD\"; instants are ISO-8601 UTC; money is rounded to the paisa. See HANDOVER.md."
   },
   "servers": [
@@ -181,7 +181,9 @@
           "noSuchUser",
           "wrongPassword",
           "tooShort",
-          "demoPassword"
+          "demoPassword",
+          "totpRequired",
+          "wrongTotp"
         ]
       },
       "ShiftProblemKind": {
@@ -3088,11 +3090,44 @@
           },
           "password": {
             "type": "string"
+          },
+          "totpCode": {
+            "type": "string",
+            "description": "Six digits from the authenticator app, once two-factor sign-in is on."
           }
         },
         "required": [
           "email",
           "password"
+        ]
+      },
+      "TotpSetup": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "Base32, for typing into an authenticator app."
+          },
+          "otpauthUrl": {
+            "type": "string",
+            "description": "otpauth://totp/… — the same secret as a QR code's content."
+          }
+        },
+        "required": [
+          "secret",
+          "otpauthUrl"
+        ]
+      },
+      "TotpCodeInput": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Six digits from the authenticator app."
+          }
+        },
+        "required": [
+          "code"
         ]
       },
       "OwnerInput": {
@@ -3297,13 +3332,18 @@
           },
           "role": {
             "$ref": "#/components/schemas/PlatformRole"
+          },
+          "totpEnabled": {
+            "type": "boolean",
+            "description": "Two-factor sign-in is on."
           }
         },
         "required": [
           "userId",
           "displayName",
           "email",
-          "role"
+          "role",
+          "totpEnabled"
         ]
       },
       "PlatformStaffInput": {
@@ -7395,6 +7435,123 @@
         "security": []
       }
     },
+    "/v1/platform/auth/totp/setup": {
+      "post": {
+        "operationId": "postPlatformAuthTotpSetup",
+        "summary": "Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code.",
+        "tags": [
+          "platform/auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-platform-role": "support"
+      }
+    },
+    "/v1/platform/auth/totp/enable": {
+      "post": {
+        "operationId": "postPlatformAuthTotpEnable",
+        "summary": "Turn two-factor sign-in on with a code from the app.",
+        "tags": [
+          "platform/auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCodeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-platform-role": "support"
+      }
+    },
+    "/v1/platform/auth/totp/disable": {
+      "post": {
+        "operationId": "postPlatformAuthTotpDisable",
+        "summary": "Turn one's own two-factor sign-in off, with a current code.",
+        "tags": [
+          "platform/auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCodeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-platform-role": "support"
+      }
+    },
     "/v1/platform/properties": {
       "get": {
         "operationId": "getPlatformProperties",
@@ -8126,6 +8283,47 @@
       "delete": {
         "operationId": "deletePlatformStaffById",
         "summary": "Remove a console user.",
+        "tags": [
+          "platform/staff"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-platform-role": "admin"
+      }
+    },
+    "/v1/platform/staff/{id}/totp": {
+      "delete": {
+        "operationId": "deletePlatformStaffByIdTotp",
+        "summary": "Turn off a console user's two-factor sign-in, e.g. after a lost phone.",
         "tags": [
           "platform/staff"
         ],

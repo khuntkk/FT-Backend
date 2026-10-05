@@ -10,6 +10,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { pgOptions } from '../config.ts';
 
 const dbDir = join(dirname(fileURLToPath(import.meta.url)), '../../../db');
 const sqlFiles = (sub: string) =>
@@ -55,7 +56,7 @@ export async function migrate(db: Queryable, log: (s: string) => void = () => {}
 if (import.meta.main) {
   const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
   if (!url) throw new Error('Set MIGRATION_DATABASE_URL (the schema owner) or DATABASE_URL.');
-  const client = new pg.Client({ connectionString: url });
+  const client = new pg.Client(pgOptions(url));
   await client.connect();
   try {
     const applied = await migrate(client, console.log);

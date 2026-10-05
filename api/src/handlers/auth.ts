@@ -16,8 +16,7 @@ export const publicAuth: PublicHandlers<'POST /v1/auth/login' | 'POST /v1/auth/r
     return c.reply.code(401).send(errorBody(new ApiError('unauthenticated', 'This session has ended.')));
   },
   'POST /v1/platform/auth/login': (c) =>
-    auth.platformLogin(c.tx, c.services.config.jwtSecret, c.body.email, c.body.password, c.req.ip,
-      device(c.req.headers['user-agent'])),
+    auth.platformLogin(c.tx, c.services.config.jwtSecret, c.body, c.req.ip, device(c.req.headers['user-agent'])),
 };
 
 export const sessionAuth: SessionHandlers<

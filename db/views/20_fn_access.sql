@@ -132,3 +132,8 @@ language sql stable security definer set search_path = public as $$
   where m.user_id = p_user_id
   order by p.name
 $$;
+
+-- It runs as its owner and takes any user id, so only the API's own roles
+-- may call it: not PUBLIC, which on Supabase includes the anonymous REST role.
+revoke execute on function fn_user_memberships(bigint) from public;
+grant execute on function fn_user_memberships(bigint) to stitchflow_api, stitchflow_platform;

@@ -32,7 +32,7 @@ export const enums = {
   ScanEngine: enumOf(['mlkitLatin', 'server']),
   SlipField: enumOf(['totalStitches', 'designStitches', 'threadBreaks', 'embMinutes', 'stopMinutes',
     'frames', 'designNo', 'designName']),
-  AuthFailureReason: enumOf(['noSuchUser', 'wrongPassword', 'tooShort', 'demoPassword']),
+  AuthFailureReason: enumOf(['noSuchUser', 'wrongPassword', 'tooShort', 'demoPassword', 'totpRequired', 'wrongTotp']),
   ShiftProblemKind: enumOf(['empty', 'noLength', 'longerThanDay', 'startsOutsideDay', 'totalOverDay',
     'overlap', 'runsPastStart']),
   SlabProblemKind: enumOf(['empty', 'inverted', 'openEndedNotLast', 'overlap', 'gap']),
@@ -583,7 +583,16 @@ const ApiErrorBody = object({
 
 // --- Platform console -------------------------------------------------------
 
-const PlatformLoginInput = object({ email: str, password: str });
+const PlatformLoginInput = object({
+  email: str,
+  password: str,
+  totpCode: doc(opt(str), 'Six digits from the authenticator app, once two-factor sign-in is on.'),
+});
+const TotpSetup = object({
+  secret: doc(str, 'Base32, for typing into an authenticator app.'),
+  otpauthUrl: doc(str, 'otpauth://totp/… — the same secret as a QR code\'s content.'),
+});
+const TotpCodeInput = object({ code: doc(str, 'Six digits from the authenticator app.') });
 
 const OwnerInput = object({ displayName: str, phone: str, email: optNul(str) });
 const CreatePropertyInput = object({
@@ -619,7 +628,10 @@ const PlatformUser = object({
   memberships: arr(ref('Membership')),
   liveSessions: int,
 });
-const PlatformStaffMember = object({ userId: id, displayName: str, email: nul(str), role: ref('PlatformRole') });
+const PlatformStaffMember = object({
+  userId: id, displayName: str, email: nul(str), role: ref('PlatformRole'),
+  totpEnabled: doc(bool, 'Two-factor sign-in is on.'),
+});
 const PlatformStaffInput = object({ displayName: str, email: str, role: ref('PlatformRole') });
 const CreatedPlatformStaff = object({
   staff: ref('PlatformStaffMember'),
@@ -642,6 +654,6 @@ export const objects = {
   SettingsPatch, ResetDataInput, MachineInput, BulkMachinesInput, BulkCreated, MachineAllowance, MachinePatch,
   StaffInput, StaffPatch, NextCode, CreatedId,
   FileRef, AuditEntry, EntryPage, AuditPage, ApiError, ApiErrorBody,
-  PlatformLoginInput, OwnerInput, CreatePropertyInput, CreatedProperty, PropertyPatch,
+  PlatformLoginInput, TotpSetup, TotpCodeInput, OwnerInput, CreatePropertyInput, CreatedProperty, PropertyPatch,
   PropertySummary, PropertyDetail, PlatformUser, PlatformStaffMember, PlatformStaffInput, CreatedPlatformStaff,
 };

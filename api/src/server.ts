@@ -6,6 +6,7 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createDb, createPool } from './db/db.ts';
 import { runDailyJobs } from './jobs/daily.ts';
+import { ensureSupabaseBucket } from './storage/storage.ts';
 
 const config = loadConfig();
 const apiPool = createPool(config.databaseUrl);
@@ -13,6 +14,7 @@ const platformPool = config.platformDatabaseUrl === config.databaseUrl
   ? apiPool
   : createPool(config.platformDatabaseUrl, 4);
 const db = createDb(apiPool, platformPool);
+if (config.supabase) await ensureSupabaseBucket(config.supabase);
 const app = await buildApp({ config, db });
 
 let timer: NodeJS.Timeout | undefined;

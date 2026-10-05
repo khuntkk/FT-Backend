@@ -189,6 +189,13 @@ export const endpoints = [
   // --- Platform console ---------------------------------------------------
   e('POST', '/v1/platform/auth/login', { auth: 'none', platformLogin: true }, 'Platform staff sign-in.',
     { body: r('PlatformLoginInput'), response: r('TokenPair') }),
+  e('POST', '/v1/platform/auth/totp/setup', platform('support'),
+    'Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code.',
+    { response: r('TotpSetup') }),
+  e('POST', '/v1/platform/auth/totp/enable', platform('support'), 'Turn two-factor sign-in on with a code from the app.',
+    { body: r('TotpCodeInput'), response: null }),
+  e('POST', '/v1/platform/auth/totp/disable', platform('support'), 'Turn one\'s own two-factor sign-in off, with a current code.',
+    { body: r('TotpCodeInput'), response: null }),
   e('GET', '/v1/platform/properties', platform('support'), 'Search properties.',
     { query: { query: opt(str), status: opt(r('PropertyStatus')) }, response: arr(r('PropertySummary')) }),
   e('POST', '/v1/platform/properties', platform('admin'), 'Create a property and its owner.',
@@ -214,6 +221,8 @@ export const endpoints = [
   e('POST', '/v1/platform/staff', platform('admin'), 'Add a console user.',
     { body: r('PlatformStaffInput'), response: r('CreatedPlatformStaff') }),
   e('DELETE', '/v1/platform/staff/:id', platform('admin'), 'Remove a console user.', { response: null }),
+  e('DELETE', '/v1/platform/staff/:id/totp', platform('admin'),
+    'Turn off a console user\'s two-factor sign-in, e.g. after a lost phone.', { response: null }),
 ];
 
 // Path parameters that are not numeric ids.

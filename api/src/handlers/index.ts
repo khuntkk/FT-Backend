@@ -11,6 +11,7 @@ import { fileHandlers } from './files.ts';
 import { machineHandlers } from './machines.ts';
 import { payrollHandlers } from './payroll.ts';
 import { platformHandlers } from './platform.ts';
+import { platformTotpHandlers } from './platformTotp.ts';
 import { productionHandlers } from './production.ts';
 import { recycleBinHandlers } from './recycleBin.ts';
 import { settingsHandlers } from './settings.ts';
@@ -35,4 +36,5 @@ export const handlers: Record<string, AnyHandler> = {
   ...recycleBinHandlers,
   ...usersHandlers,
   ...platformHandlers,
+  ...platformTotpHandlers,
 };

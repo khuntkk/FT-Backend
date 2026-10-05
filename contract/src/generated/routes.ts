@@ -585,6 +585,27 @@ export interface ApiRoutes {
     body: T.PlatformLoginInput;
     response: T.TokenPair;
   };
+  /** Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code. */
+  "POST /v1/platform/auth/totp/setup": {
+    params: {  };
+    query: {  };
+    body: undefined;
+    response: T.TotpSetup;
+  };
+  /** Turn two-factor sign-in on with a code from the app. */
+  "POST /v1/platform/auth/totp/enable": {
+    params: {  };
+    query: {  };
+    body: T.TotpCodeInput;
+    response: void;
+  };
+  /** Turn one's own two-factor sign-in off, with a current code. */
+  "POST /v1/platform/auth/totp/disable": {
+    params: {  };
+    query: {  };
+    body: T.TotpCodeInput;
+    response: void;
+  };
   /** Search properties. */
   "GET /v1/platform/properties": {
     params: {  };
@@ -685,6 +706,13 @@ export interface ApiRoutes {
   };
   /** Remove a console user. */
   "DELETE /v1/platform/staff/:id": {
+    params: { id: number };
+    query: {  };
+    body: undefined;
+    response: void;
+  };
+  /** Turn off a console user's two-factor sign-in, e.g. after a lost phone. */
+  "DELETE /v1/platform/staff/:id/totp": {
     params: { id: number };
     query: {  };
     body: undefined;
@@ -1613,6 +1641,39 @@ export const ROUTES: readonly RouteInfo[] = [
     "ownerOnly": false
   },
   {
+    "key": "POST /v1/platform/auth/totp/setup",
+    "method": "POST",
+    "path": "/v1/platform/auth/totp/setup",
+    "summary": "Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code.",
+    "action": null,
+    "auth": "platform",
+    "platformRole": "support",
+    "destructive": false,
+    "ownerOnly": false
+  },
+  {
+    "key": "POST /v1/platform/auth/totp/enable",
+    "method": "POST",
+    "path": "/v1/platform/auth/totp/enable",
+    "summary": "Turn two-factor sign-in on with a code from the app.",
+    "action": null,
+    "auth": "platform",
+    "platformRole": "support",
+    "destructive": false,
+    "ownerOnly": false
+  },
+  {
+    "key": "POST /v1/platform/auth/totp/disable",
+    "method": "POST",
+    "path": "/v1/platform/auth/totp/disable",
+    "summary": "Turn one's own two-factor sign-in off, with a current code.",
+    "action": null,
+    "auth": "platform",
+    "platformRole": "support",
+    "destructive": false,
+    "ownerOnly": false
+  },
+  {
     "key": "GET /v1/platform/properties",
     "method": "GET",
     "path": "/v1/platform/properties",
@@ -1771,6 +1832,17 @@ export const ROUTES: readonly RouteInfo[] = [
     "method": "DELETE",
     "path": "/v1/platform/staff/:id",
     "summary": "Remove a console user.",
+    "action": null,
+    "auth": "platform",
+    "platformRole": "admin",
+    "destructive": false,
+    "ownerOnly": false
+  },
+  {
+    "key": "DELETE /v1/platform/staff/:id/totp",
+    "method": "DELETE",
+    "path": "/v1/platform/staff/:id/totp",
+    "summary": "Turn off a console user's two-factor sign-in, e.g. after a lost phone.",
     "action": null,
     "auth": "platform",
     "platformRole": "admin",

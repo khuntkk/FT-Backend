@@ -692,6 +692,27 @@ export interface ApiRoutes {
         body: T.PlatformLoginInput;
         response: T.TokenPair;
     };
+    /** Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code. */
+    "POST /v1/platform/auth/totp/setup": {
+        params: {};
+        query: {};
+        body: undefined;
+        response: T.TotpSetup;
+    };
+    /** Turn two-factor sign-in on with a code from the app. */
+    "POST /v1/platform/auth/totp/enable": {
+        params: {};
+        query: {};
+        body: T.TotpCodeInput;
+        response: void;
+    };
+    /** Turn one's own two-factor sign-in off, with a current code. */
+    "POST /v1/platform/auth/totp/disable": {
+        params: {};
+        query: {};
+        body: T.TotpCodeInput;
+        response: void;
+    };
     /** Search properties. */
     "GET /v1/platform/properties": {
         params: {};
@@ -821,6 +842,15 @@ export interface ApiRoutes {
     };
     /** Remove a console user. */
     "DELETE /v1/platform/staff/:id": {
+        params: {
+            id: number;
+        };
+        query: {};
+        body: undefined;
+        response: void;
+    };
+    /** Turn off a console user's two-factor sign-in, e.g. after a lost phone. */
+    "DELETE /v1/platform/staff/:id/totp": {
         params: {
             id: number;
         };

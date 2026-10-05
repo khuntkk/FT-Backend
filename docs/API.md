@@ -233,7 +233,11 @@ reset passwords; everything else needs `admin`.
 
 | Method | Path | Who | |
 | --- | --- | --- | --- |
-| POST | `/platform/auth/login` | staff | Email + password; TOTP second factor before go-live (open decision). |
+| POST | `/platform/auth/login` | staff | `{ email, password, totpCode? }`. Once a staff member has two-factor sign-in on, `totpCode` is required: without it `401 unauthenticated` with `details.reason: totpRequired`, a wrong or reused one `wrongTotp`. |
+| POST | `/platform/auth/totp/setup` | staff (self) | → `{ secret, otpauthUrl }` for an authenticator app (TOTP: SHA-1, 30 s, 6 digits). Not on until enabled. |
+| POST | `/platform/auth/totp/enable` | staff (self) | `{ code }` from the app → 204. Sign-in needs a code from now on. |
+| POST | `/platform/auth/totp/disable` | staff (self) | `{ code }` → 204. |
+| DELETE | `/platform/staff/:id/totp` | admin | Turns another staff member's two-factor sign-in off (lost phone). Not one's own. |
 | GET | `/platform/properties?query=&status=` | support | Search by name or code. Each with `machineCount` and `machineLimit`. |
 | POST | `/platform/properties` | admin | `{ code, name, timezone, machineLimit, owner: { displayName, phone, email? } }` → creates the property, its settings, the default shift arrangement, and the owner (a new user, or an existing one by phone) as its main super admin. Returns the owner's temporary password once. |
 | GET | `/platform/properties/:id` | support | Details, members, counts, last activity. |
@@ -245,7 +249,7 @@ reset passwords; everything else needs `admin`.
 | POST | `/platform/users/:id/disable` · `/enable` | admin | Across every property. |
 | DELETE | `/platform/users/:id/sessions` | support | Sign out everywhere. |
 | GET | `/platform/audit?propertyId=&actorUserId=&from=&to=&destructive=` | support | Paged. |
-| GET / POST / DELETE | `/platform/staff` | admin | Our own console users. |
+| GET / POST / DELETE | `/platform/staff` | admin | Our own console users, each with `totpEnabled`. |
 
 The console never shows a property's pay figures or slips; support reads
 structure (who, which role, when), not the unit's business. A read-only

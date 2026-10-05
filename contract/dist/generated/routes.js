@@ -903,6 +903,39 @@ export const ROUTES = [
         "ownerOnly": false
     },
     {
+        "key": "POST /v1/platform/auth/totp/setup",
+        "method": "POST",
+        "path": "/v1/platform/auth/totp/setup",
+        "summary": "Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "support",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
+        "key": "POST /v1/platform/auth/totp/enable",
+        "method": "POST",
+        "path": "/v1/platform/auth/totp/enable",
+        "summary": "Turn two-factor sign-in on with a code from the app.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "support",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
+        "key": "POST /v1/platform/auth/totp/disable",
+        "method": "POST",
+        "path": "/v1/platform/auth/totp/disable",
+        "summary": "Turn one's own two-factor sign-in off, with a current code.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "support",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
         "key": "GET /v1/platform/properties",
         "method": "GET",
         "path": "/v1/platform/properties",
@@ -1061,6 +1094,17 @@ export const ROUTES = [
         "method": "DELETE",
         "path": "/v1/platform/staff/:id",
         "summary": "Remove a console user.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "admin",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
+        "key": "DELETE /v1/platform/staff/:id/totp",
+        "method": "DELETE",
+        "path": "/v1/platform/staff/:id/totp",
+        "summary": "Turn off a console user's two-factor sign-in, e.g. after a lost phone.",
         "action": null,
         "auth": "platform",
         "platformRole": "admin",

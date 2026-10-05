@@ -7,7 +7,7 @@ import * as files from '../services/files.ts';
 
 const PURPOSES = Object.keys(files.UPLOAD_ACTION);
 
-/** The API's own origin as the client reached it: signed URLs are served here. */
+/** The API's own origin as the client reached it: local disk's signed URLs are served here. */
 const origin = (req: FastifyRequest) => `${req.protocol}://${req.host}`;
 
 export const fileHandlers: SessionHandlers<'POST /v1/files' | 'GET /v1/files/:fileId'> = {
@@ -29,8 +29,7 @@ export const fileHandlers: SessionHandlers<'POST /v1/files' | 'GET /v1/files/:fi
     }
     if (!bytes) throw new ApiError('validation_failed', 'No file.', { fields: { file: 'required' } });
     await c.assertCan(files.UPLOAD_ACTION[purpose as FilePurpose]);
-    const ref = await files.upload(c.tx, c.services.storage, member, purpose as FilePurpose, bytes);
-    return { ...ref, url: origin(c.req) + ref.url };
+    return files.upload(c.tx, c.services.storage, member, purpose as FilePurpose, bytes, origin(c.req));
   },
 
   'GET /v1/files/:fileId': async (c) => {
@@ -48,6 +47,6 @@ export const fileHandlers: SessionHandlers<'POST /v1/files' | 'GET /v1/files/:fi
       }
     }
     if (refused) throw refused;
-    return c.reply.redirect(origin(c.req) + c.services.storage.signedPath(f.key), 302);
+    return c.reply.redirect(await c.services.storage.signedUrl(f.key, origin(c.req)), 302);
   },
 };

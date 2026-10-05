@@ -76,7 +76,7 @@ function webpSize(b: Buffer): { width: number | null; height: number | null } {
 }
 
 export async function upload(
-  tx: Tx, storage: Storage, member: Member, purpose: FilePurpose, bytes: Buffer,
+  tx: Tx, storage: Storage, member: Member, purpose: FilePurpose, bytes: Buffer, origin: string,
 ): Promise<FileRef> {
   if (bytes.length === 0) throw new ApiError('validation_failed', 'Empty file.', { fields: { file: 'empty' } });
   if (bytes.length > MAX_FILE_BYTES) throw new ApiError('file_too_large', 'Over 15 MB.');
@@ -96,7 +96,7 @@ export async function upload(
   // Written last: if the insert fails, nothing is left on disk. If the
   // commit fails after this, an orphan file is left, which is harmless.
   await storage.put(key, bytes, image.contentType);
-  return { id, purpose, url: storage.signedPath(key), width: image.width, height: image.height };
+  return { id, purpose, url: await storage.signedUrl(key, origin), width: image.width, height: image.height };
 }
 
 export async function find(tx: Tx, id: string): Promise<{ purpose: FilePurpose; key: string }> {

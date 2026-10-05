@@ -148,3 +148,5 @@ vite.config.ts.timestamp-*
 !contract/dist/
 # Uploaded files in development
 var/
+# Database CA certificates
+certs/

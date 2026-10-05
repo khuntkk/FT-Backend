@@ -36,6 +36,13 @@ const section = (name) => console.log(`• ${name}`);
 
 // ---------------------------------------------------------------------------
 section('applying migrations and views');
+// As on Supabase: REST roles that are granted everything the schema owner
+// creates in public. 0008 must take all of it back.
+await db.exec(`
+  create role anon nologin; create role authenticated nologin;
+  alter default privileges in schema public grant all on tables to anon, authenticated;
+  alter default privileges in schema public grant all on sequences to anon, authenticated;
+  alter default privileges in schema public grant all on functions to anon, authenticated;`);
 for (const sub of ['migrations', 'views']) {
   for (const f of readdirSync(join(root, sub)).filter((f) => f.endsWith('.sql')).sort()) {
     await db.exec(readFileSync(join(root, sub, f), 'utf8'));
@@ -311,6 +318,19 @@ const ownerViews = (await db.query(
     where relkind = 'v' and relnamespace = 'public'::regnamespace
       and not coalesce(reloptions @> array['security_invoker=true'], false)`)).rows.map((r) => r.relname);
 ok(ownerViews.length === 0, `every view has security_invoker (not: ${ownerViews.join(', ')})`);
+
+section('nothing is reachable through Supabase\'s REST roles');
+for (const r of ['anon', 'authenticated']) {
+  const tables = (await db.query(
+    `select c.relname from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'v')
+       and (has_table_privilege($1, c.oid, 'select') or has_table_privilege($1, c.oid, 'insert'))`, [r]))
+    .rows.map((x) => x.relname);
+  ok(tables.length === 0, `${r} can read or write no table or view (can: ${tables.join(', ')})`);
+  const definers = (await db.query(
+    `select p.proname from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
+       and has_function_privilege($1, p.oid, 'execute')`, [r])).rows.map((x) => x.proname);
+  ok(definers.length === 0, `${r} can call no security-definer function (can: ${definers.join(', ')})`);
+}
 
 section('every table that belongs to a property has row-level security');
 const openTables = (await db.query(

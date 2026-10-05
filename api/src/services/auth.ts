@@ -6,7 +6,7 @@
 // copied, so the whole family is revoked.
 
 import type {
-  ClientKind, LoginInput, LoginResult, Membership, PlatformRole, TokenPair, UserRole,
+  ClientKind, LoginInput, LoginResult, Membership, PlatformLoginInput, PlatformRole, TokenPair, UserRole,
 } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { ApiError } from '../http/errors.ts';
@@ -14,6 +14,7 @@ import { checkPassword, hashPassword, passwordProblem } from '../auth/passwords.
 import {
   ACCESS_TOKEN_SECONDS, hashToken, newRefreshToken, signAccessToken, type AccessClaims,
 } from '../auth/tokens.ts';
+import * as platformTotp from './platformTotp.ts';
 import { getUser } from './shapes.ts';
 import { signInByIdentifier, signInByIp } from './rateLimit.ts';
 
@@ -138,11 +139,21 @@ export async function login(
 }
 
 export async function platformLogin(
-  tx: Tx, secret: string, email: string, password: string, ip: string, deviceLabel: string | null,
+  tx: Tx, secret: string, input: PlatformLoginInput, ip: string, deviceLabel: string | null,
 ): Promise<TokenPair> {
-  const userId = await authenticate(tx, 'email', email.trim(), password, ip);
+  const email = input.email.trim();
+  const userId = await authenticate(tx, 'email', email, input.password, ip);
   const staff = await tx.one<{ role: PlatformRole }>(`select role from platform_staff where user_id = $1`, [userId]);
   if (!staff) throw new ApiError('forbidden', 'Not console staff.');
+  const totp = await platformTotp.checkAtSignIn(tx, userId, input.totpCode);
+  if (totp === 'wrongTotp') {
+    signInByIdentifier.recordFailure(`email:${email.toLowerCase()}`);
+    signInByIp.recordFailure(ip);
+  }
+  if (totp) {
+    throw new ApiError('unauthenticated', totp === 'totpRequired'
+      ? 'Enter the code from your authenticator app.' : 'That code does not match.', { reason: totp });
+  }
   return openSession(tx, secret, { userId, memberId: null, client: 'webAdmin', keepSignedIn: false, deviceLabel },
     { mid: null, pid: null, role: null, prole: staff.role });
 }

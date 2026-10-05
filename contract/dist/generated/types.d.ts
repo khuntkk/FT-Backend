@@ -46,8 +46,8 @@ export type ScanEngine = "mlkitLatin" | "server";
 export declare const ScanEngineValues: readonly ["mlkitLatin", "server"];
 export type SlipField = "totalStitches" | "designStitches" | "threadBreaks" | "embMinutes" | "stopMinutes" | "frames" | "designNo" | "designName";
 export declare const SlipFieldValues: readonly ["totalStitches", "designStitches", "threadBreaks", "embMinutes", "stopMinutes", "frames", "designNo", "designName"];
-export type AuthFailureReason = "noSuchUser" | "wrongPassword" | "tooShort" | "demoPassword";
-export declare const AuthFailureReasonValues: readonly ["noSuchUser", "wrongPassword", "tooShort", "demoPassword"];
+export type AuthFailureReason = "noSuchUser" | "wrongPassword" | "tooShort" | "demoPassword" | "totpRequired" | "wrongTotp";
+export declare const AuthFailureReasonValues: readonly ["noSuchUser", "wrongPassword", "tooShort", "demoPassword", "totpRequired", "wrongTotp"];
 export type ShiftProblemKind = "empty" | "noLength" | "longerThanDay" | "startsOutsideDay" | "totalOverDay" | "overlap" | "runsPastStart";
 export declare const ShiftProblemKindValues: readonly ["empty", "noLength", "longerThanDay", "startsOutsideDay", "totalOverDay", "overlap", "runsPastStart"];
 export type SlabProblemKind = "empty" | "inverted" | "openEndedNotLast" | "overlap" | "gap";
@@ -757,6 +757,18 @@ export interface ApiErrorBody {
 export interface PlatformLoginInput {
     email: string;
     password: string;
+    /** Six digits from the authenticator app, once two-factor sign-in is on. */
+    totpCode?: string;
+}
+export interface TotpSetup {
+    /** Base32, for typing into an authenticator app. */
+    secret: string;
+    /** otpauth://totp/… — the same secret as a QR code's content. */
+    otpauthUrl: string;
+}
+export interface TotpCodeInput {
+    /** Six digits from the authenticator app. */
+    code: string;
 }
 export interface OwnerInput {
     displayName: string;
@@ -813,6 +825,8 @@ export interface PlatformStaffMember {
     displayName: string;
     email: string | null;
     role: PlatformRole;
+    /** Two-factor sign-in is on. */
+    totpEnabled: boolean;
 }
 export interface PlatformStaffInput {
     displayName: string;

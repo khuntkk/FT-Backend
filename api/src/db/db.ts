@@ -6,6 +6,7 @@
 // API role sees no tenant rows at all — it fails closed (0004_security.sql).
 
 import pg from 'pg';
+import { pgOptions } from '../config.ts';
 
 // The apps decode JSON numbers and "YYYY-MM-DD" dates; pg's defaults would
 // send bigint and numeric as strings and turn a DATE into a local-midnight
@@ -46,12 +47,8 @@ export interface Db {
   close(): Promise<void>;
 }
 
-export function createPool(connectionString: string, max = 10): pg.Pool {
-  const pool = new pg.Pool({ connectionString, max });
-  pool.on('connect', (client) => {
-    client.query(`set time zone 'UTC'`).catch(() => {});
-  });
-  return pool;
+export function createPool(url: string, max = 10): pg.Pool {
+  return new pg.Pool({ ...pgOptions(url), max });
 }
 
 /** One connection, held for a transaction. pg's PoolClient is one. */
@@ -76,6 +73,9 @@ async function inTransaction<T>(
   };
   try {
     await client.query('begin');
+    // Per transaction, not per connection: behind a transaction pooler
+    // (Supabase's port 6543) each transaction may get a different session.
+    await client.query(`set local time zone 'UTC'`);
     await client.query(`set local role ${role}`);
     if (propertyId !== null) {
       await client.query(`select set_config('app.property_id', $1, true)`, [String(propertyId)]);

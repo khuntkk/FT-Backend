@@ -11,7 +11,7 @@ import { registerRoutes } from './http/router.ts';
 import { ajvOptions, sharedSchema } from './http/schemas.ts';
 import type { Services } from './http/types.ts';
 import { handlers } from './handlers/index.ts';
-import { localStorage, type Storage } from './storage/storage.ts';
+import { localStorage, supabaseStorage, type Storage } from './storage/storage.ts';
 import { MAX_FILE_BYTES } from './services/files.ts';
 
 export interface AppDeps {
@@ -32,7 +32,9 @@ export async function buildApp({ config, db, storage, events }: AppDeps): Promis
   });
   const services: Services = {
     config,
-    storage: storage ?? localStorage(config.filesDir, config.jwtSecret),
+    storage: storage ?? (config.supabase
+      ? supabaseStorage(config.supabase)
+      : localStorage(config.filesDir, config.jwtSecret)),
     events: events ?? new EventBus(),
   };
 
@@ -68,18 +70,21 @@ export async function buildApp({ config, db, storage, events }: AppDeps): Promis
 
   app.get('/health', async () => ({ ok: true }));
 
-  // Signed photo URLs (storage.ts): no token, the signature is the permission.
-  app.get('/files/raw/*', async (req, reply) => {
-    const key = (req.params as { '*': string })['*'];
-    const { exp, sig } = req.query as { exp?: string; sig?: string };
-    if (!services.storage.verify(key, exp ?? '', sig ?? '')) {
-      return reply.code(403).send({ error: { code: 'forbidden', message: 'Link expired or invalid.' } });
-    }
-    const bytes = await services.storage.get(key);
-    if (!bytes) return reply.code(404).send({ error: { code: 'not_found', message: 'No such file.' } });
-    const type = key.endsWith('.png') ? 'image/png' : key.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-    return reply.header('cache-control', 'private, max-age=600').type(type).send(bytes);
-  });
+  // Local disk's signed photo URLs (storage.ts): no token, the signature is the permission.
+  const local = services.storage.local;
+  if (local) {
+    app.get('/files/raw/*', async (req, reply) => {
+      const key = (req.params as { '*': string })['*'];
+      const { exp, sig } = req.query as { exp?: string; sig?: string };
+      if (!local.verify(key, exp ?? '', sig ?? '')) {
+        return reply.code(403).send({ error: { code: 'forbidden', message: 'Link expired or invalid.' } });
+      }
+      const bytes = await local.get(key);
+      if (!bytes) return reply.code(404).send({ error: { code: 'not_found', message: 'No such file.' } });
+      const type = key.endsWith('.png') ? 'image/png' : key.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+      return reply.header('cache-control', 'private, max-age=600').type(type).send(bytes);
+    });
+  }
 
   registerRoutes(app, db, services, handlers);
   return app;
