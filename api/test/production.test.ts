@@ -62,7 +62,7 @@ describe('recording a slip', () => {
     assert.match(res.body.entry.createdAt, /Z$/);
     assert.deepEqual(res.body.karigars.map((k: any) => [k.staff.name, k.isHalfDay]), [['Ravi', false], ['Sita', true]]);
     assert.deepEqual(Object.keys(res.body.karigars[0].staff).sort(),
-      ['category', 'code', 'id', 'isActive', 'name', 'photoFileId'], 'a Person: no pay');
+      ['allowHalfDay', 'category', 'code', 'id', 'isActive', 'name', 'photoFileId'], 'a Person: no pay');
   });
 
   it('keeps a bonus typed by hand (by someone who may see pay), split to the paisa', async () => {

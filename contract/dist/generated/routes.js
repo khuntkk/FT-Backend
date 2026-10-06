@@ -903,6 +903,17 @@ export const ROUTES = [
         "ownerOnly": false
     },
     {
+        "key": "GET /v1/platform/me",
+        "method": "GET",
+        "path": "/v1/platform/me",
+        "summary": "The signed-in console user: who, which role, two-factor on or not.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "support",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
         "key": "POST /v1/platform/auth/totp/setup",
         "method": "POST",
         "path": "/v1/platform/auth/totp/setup",

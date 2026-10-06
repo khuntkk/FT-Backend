@@ -1,0 +1,62 @@
+# The API on one server: the API container behind Caddy, which gets and renews
+# the HTTPS certificate. docs/DEPLOY-EC2.md is the walkthrough.
+#
+#   cd deploy/ec2 && docker compose up -d
+#
+# Secrets come from the repo's .env (../../.env); the domain from
+# deploy/ec2/.env (API_DOMAIN=...), which Compose reads on its own.
+
+services:
+  api:
+    build:
+      context: ../..
+    image: stitchflow-api
+    restart: unless-stopped
+    env_file: ../../.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      # Caddy is the only way in, so its X-Forwarded-* headers are trusted.
+      TRUST_PROXY: "true"
+    volumes:
+      # DATABASE_CA_FILE=certs/supabase-ca.crt resolves to /app/certs.
+      - ../../certs:/app/certs:ro
+    # Reachable from Caddy only, never published on the server's ports.
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in deploy/ec2/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+volumes:
+  # Caddy's certificates and keys: kept so a restart does not ask for new ones.
+  caddy_data:
+  caddy_config:

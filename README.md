@@ -4,18 +4,20 @@ The StitchFlow backend: the API the Flutter apps (manager app, Crew app) and
 the web admin panel talk to, and the PostgreSQL schema behind it. The apps
 live in the Flutter repo; the contract between them is [`docs/API.md`](docs/API.md).
 
-The handover manual (`docs/handover/HANDOVER.md` in the Flutter repo) explains
-the domain, the decisions, roles and permissions. This repo was seeded from
-its `stitchflow-platform/` folder (kit 1.1.0).
+**Start with [`docs/HANDOVER.md`](docs/HANDOVER.md)**: the domain, how this
+repo fits with the Flutter apps and the web admin panel (`StitchFlow-Web`),
+roles and permissions, where things stand and what is still open. This repo is
+the source of truth for the schema, the permissions and the contract.
 
 | Path             | Is                                                                                                                             |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `api/`           | The API: Node.js 24 + TypeScript (run directly by Node, no build step), Fastify, `pg`. All 101 routes of the contract (1.2.0). |
+| `api/`           | The API: Node.js 24 + TypeScript (run directly by Node, no build step), Fastify, `pg`. All 102 routes of the contract (1.3.0). |
 | `db/migrations/` | The schema. Applied once each, in order.                                                                                       |
 | `db/views/`      | Views (`vw_*`) and functions (`fn_*`): re-applied on every deploy.                                                             |
 | `db/check/`      | Applies all of it to a throwaway Postgres and checks 100 rules hold.                                                           |
 | `contract/`      | `@stitchflow/contract`: types, route table, permission rule, `openapi.json`. The API validates every request against it.       |
 | `docs/API.md`    | Contract v1.                                                                                                                   |
+| `docs/HANDOVER.md` | The domain, the three repos, roles, where things stand, open decisions. Read first.                                         |
 
 ## What you need
 
@@ -99,11 +101,12 @@ Everything secret goes into `.env` (git-ignored), never into the code or a chat.
    Android phone on the same Wi-Fi reaches it as `http://<your Mac's LAN IP>:3000`;
    debug builds of the app allow plain HTTP for that.
 
-8. **Create a unit and its owner.** There is no web admin panel yet, so use the
-   console API directly. Sign in, change the temporary password, sign in again:
+8. **Create a unit and its owner.** Easiest from the web admin panel
+   (the `StitchFlow-Web` repo: `npm run dev` there, sign in as the admin from
+   step 6). Or with the console API directly: Sign in, change the temporary password, sign in again:
 
    ```bash
-   curl -s localhost:3000/v1/platform/auth/login -H 'content-type: application/json' -d '{"email":"khunt.kk2@gmail.com","password":"XjXwyJyGG6"}'
+   curl -s localhost:3000/v1/platform/auth/login -H 'content-type: application/json' -d '{"email":"<your email>","password":"<temporary password>"}'
    ```
 
    ```bash
@@ -142,12 +145,17 @@ anything else uses TLS (`DATABASE_SSL`: `off`, `require`, `verify`).
 npm test
 ```
 
-Runs the schema rules (`db/check`), the contract's tests, and the API's 318
-tests. Each API test file gets its own throwaway database. One file:
+Runs the schema rules (`db/check`), the contract's tests, and the API's tests
+(about 315). Each API test file gets its own throwaway database. One file:
 
 ```bash
 node --test api/test/payroll.test.ts
 ```
+
+`npm run serve:test -w api` starts a throwaway API on an in-process database
+at port 3900, with test-only routes that create a unit or console staff
+(`docs/HANDOVER.md` §6). The Flutter repo's data-layer contract tests and the
+web panel's local development run against it, so keep it working.
 
 Typecheck: `npm run typecheck`. CI (`.github/workflows/ci.yml`) runs all of it.
 
@@ -168,7 +176,7 @@ api/src/
   auth/               JWT (HS256, 15 min), rotating refresh tokens, argon2id
   db/                 pg pool, transactions, migrations
   jobs/               daily: purge the bin past 7 days, expired sessions and idempotency keys
-  storage/            photo bytes (local disk for now)
+  storage/            photo bytes: Supabase Storage, or local disk without SUPABASE_URL
 ```
 
 Rules that are easy to break:
@@ -187,9 +195,13 @@ Rules that are easy to break:
 ## Production
 
 - `Dockerfile` builds the API as one container (`node src/server.ts`).
+- One server on AWS EC2 behind Caddy (HTTPS): [`docs/DEPLOY-EC2.md`](docs/DEPLOY-EC2.md),
+  with the files in `deploy/ec2/`.
 - Set the environment from `.env.example` through the host's secret store.
 - Run `npm run migrate` (as the schema owner) on each deploy before starting.
 - Behind HTTPS. Set `TRUST_PROXY=true` behind a load balancer.
+- The web admin panel (`StitchFlow-Web`) is a static site: serve it behind
+  the API's origin, or on its own and list that origin in `CORS_ORIGINS`.
 - The daily jobs run inside the API (`RUN_JOBS=true`); with more than one
   instance, set `RUN_JOBS=false` and run `npm run purge -w api` once a day
   from a scheduler.

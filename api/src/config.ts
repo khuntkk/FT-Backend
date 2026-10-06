@@ -23,6 +23,8 @@ export interface Config {
   logLevel: string;
   /** Behind a load balancer: trust X-Forwarded-* for the client's IP and scheme. */
   trustProxy: boolean;
+  /** Browser origins allowed to call the API (the web admin panel's), e.g. https://admin.example.com. */
+  corsOrigins: string[];
 }
 
 function required(name: string): string {
@@ -46,6 +48,7 @@ export function loadConfig(): Config {
     runJobs: process.env.RUN_JOBS !== 'false',
     logLevel: process.env.LOG_LEVEL ?? 'info',
     trustProxy: process.env.TRUST_PROXY === 'true',
+    corsOrigins: (process.env.CORS_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   };
 }
 

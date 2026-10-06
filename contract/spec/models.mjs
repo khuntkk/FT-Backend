@@ -151,6 +151,7 @@ const Person = object({
   category: ref('StaffCategory'),
   photoFileId: nul(uuid),
   isActive: bool,
+  allowHalfDay: doc(bool, 'Whether a half day may be marked for them. Not pay.'),
 }, 'A person without pay, for pickers and attendance — what a supervisor may see.');
 
 // --- Shifts -----------------------------------------------------------------

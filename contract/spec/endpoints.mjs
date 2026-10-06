@@ -189,6 +189,8 @@ export const endpoints = [
   // --- Platform console ---------------------------------------------------
   e('POST', '/v1/platform/auth/login', { auth: 'none', platformLogin: true }, 'Platform staff sign-in.',
     { body: r('PlatformLoginInput'), response: r('TokenPair') }),
+  e('GET', '/v1/platform/me', platform('support'), 'The signed-in console user: who, which role, two-factor on or not.',
+    { response: r('PlatformStaffMember') }),
   e('POST', '/v1/platform/auth/totp/setup', platform('support'),
     'Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code.',
     { response: r('TotpSetup') }),

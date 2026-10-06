@@ -38,6 +38,20 @@ export async function buildApp({ config, db, storage, events }: AppDeps): Promis
     events: events ?? new EventBus(),
   };
 
+  // An empty body labelled JSON (a DELETE from some HTTP clients) is no body,
+  // not a malformed one.
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = String(body);
+    if (text.trim() === '') return done(null, undefined);
+    try {
+      done(null, JSON.parse(text));
+    } catch (e) {
+      (e as { statusCode?: number }).statusCode = 400;
+      done(e as Error, undefined);
+    }
+  });
+
   app.addSchema(sharedSchema);
   await app.register(multipart, { limits: { fileSize: MAX_FILE_BYTES, files: 1 } });
 
@@ -69,6 +83,26 @@ export async function buildApp({ config, db, storage, events }: AppDeps): Promis
     reply.code(404).send({ error: { code: 'not_found', message: `${req.method} ${req.url} is not a route.` } }));
 
   app.get('/health', async () => ({ ok: true }));
+
+  // The web admin panel calls from its own origin when it is not served
+  // behind the API's. Only the origins in CORS_ORIGINS; tokens travel in the
+  // Authorization header, so no cookies and no credentials mode.
+  const allowed = new Set(config.corsOrigins);
+  if (allowed.size) {
+    app.addHook('onRequest', async (req, reply) => {
+      const origin = req.headers.origin;
+      if (!origin || !allowed.has(origin)) return;
+      reply.header('access-control-allow-origin', origin).header('vary', 'Origin');
+      if (req.method === 'OPTIONS') {
+        return reply
+          .header('access-control-allow-methods', 'GET, POST, PUT, PATCH, DELETE')
+          .header('access-control-allow-headers', 'authorization, content-type, idempotency-key, x-request-id')
+          .header('access-control-max-age', '600')
+          .code(204)
+          .send();
+      }
+    });
+  }
 
   // Local disk's signed photo URLs (storage.ts): no token, the signature is the permission.
   const local = services.storage.local;

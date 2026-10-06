@@ -83,6 +83,15 @@ describe('machines', () => {
     assert.equal(audit.before.number, m.number);
   });
 
+  it('takes a bodiless DELETE labelled JSON, as some HTTP clients send it', async () => {
+    const m = await as.admin.post('/v1/machines', { number: 99 });
+    if (m.status !== 200) return; // at the limit by now: nothing to delete
+    const res = await as.superAdmin.call('DELETE', `/v1/machines/${m.body.id}`, {
+      headers: { 'content-type': 'application/json' },
+    });
+    assert.equal(res.status, 204);
+  });
+
   it('cannot see or touch another property\'s machines', async () => {
     const other = await seedProperty(h);
     const [{ id }] = await h.sql(`insert into machines (property_id, number) values ($1, 1) returning id`,

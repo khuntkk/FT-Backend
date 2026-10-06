@@ -692,6 +692,13 @@ export interface ApiRoutes {
         body: T.PlatformLoginInput;
         response: T.TokenPair;
     };
+    /** The signed-in console user: who, which role, two-factor on or not. */
+    "GET /v1/platform/me": {
+        params: {};
+        query: {};
+        body: undefined;
+        response: T.PlatformStaffMember;
+    };
     /** Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code. */
     "POST /v1/platform/auth/totp/setup": {
         params: {};

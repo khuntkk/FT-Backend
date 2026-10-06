@@ -377,7 +377,7 @@ export function listStaff(tx: Tx): Promise<PlatformStaffMember[]> {
   return tx.rows<PlatformStaffMember>(`${STAFF_SQL} order by u.display_name, ps.user_id`);
 }
 
-async function getStaff(tx: Tx, userId: number): Promise<PlatformStaffMember | undefined> {
+export async function getStaff(tx: Tx, userId: number): Promise<PlatformStaffMember | undefined> {
   return tx.one<PlatformStaffMember>(`${STAFF_SQL} where ps.user_id = $1`, [userId]);
 }
 

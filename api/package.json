@@ -11,7 +11,8 @@
     "purge": "node --env-file-if-exists=../.env src/jobs/run.ts",
     "create-platform-admin": "node --env-file-if-exists=../.env src/jobs/createPlatformAdmin.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\""
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "serve:test": "node test/serve.ts"
   },
   "engines": {
     "node": ">=22.18"

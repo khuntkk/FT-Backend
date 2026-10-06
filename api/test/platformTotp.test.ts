@@ -49,6 +49,8 @@ describe('two-factor sign-in for console staff', () => {
     assert.equal(wrong.status, 400);
     assert.equal(wrong.body.error.details.fields.code, 'wrongTotp');
     assert.equal((await ana.post('/v1/platform/auth/totp/enable', { code: codeFor(secret, -1) })).status, 204);
+    const me = await ana.get('/v1/platform/me');
+    assert.deepEqual([me.body.email, me.body.role, me.body.totpEnabled], ['ana@stitchflow.test', 'admin', true]);
     const list = await ana.get('/v1/platform/staff');
     assert.equal(list.body.find((s: any) => s.email === 'ana@stitchflow.test').totpEnabled, true);
   });

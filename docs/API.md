@@ -219,8 +219,8 @@ Purging items past seven days is a **scheduled job** (daily), not an endpoint an
 | POST | `/files` | the action of whatever the file is for (`machines.update`, `staff.update`, `production.record`) | `multipart/form-data`: `purpose` (`machinePhoto`/`staffPhoto`/`slipPhoto`), `file`. JPEG/PNG/WebP ≤ 15 MB. → `{ id, url, width, height }`. |
 | GET | `/files/:id` | view on the owning module | `302` to a short-lived signed URL. |
 
-### Live updates (phase 2)
-`GET /v1/events` — Server-Sent Events: `{ "table": "production_entries", "ids": [...] }` after each write in the property, so the apps refresh the stream that shows it instead of polling. Until then the apps refetch after their own writes and on resume.
+### Live updates
+`GET /v1/events` — Server-Sent Events: `{ "table": "production_entries", "ids": [...] }` after each write in the property, so the apps refresh the stream that shows it instead of polling. Sent as `event: change`, with a `: ping` comment every 25 s. The apps also refetch after their own writes and on resume.
 
 ---
 
@@ -234,6 +234,7 @@ reset passwords; everything else needs `admin`.
 | Method | Path | Who | |
 | --- | --- | --- | --- |
 | POST | `/platform/auth/login` | staff | `{ email, password, totpCode? }`. Once a staff member has two-factor sign-in on, `totpCode` is required: without it `401 unauthenticated` with `details.reason: totpRequired`, a wrong or reused one `wrongTotp`. |
+| GET | `/platform/me` | staff | The signed-in console user: `{ userId, displayName, email, role, totpEnabled }`. |
 | POST | `/platform/auth/totp/setup` | staff (self) | → `{ secret, otpauthUrl }` for an authenticator app (TOTP: SHA-1, 30 s, 6 digits). Not on until enabled. |
 | POST | `/platform/auth/totp/enable` | staff (self) | `{ code }` from the app → 204. Sign-in needs a code from now on. |
 | POST | `/platform/auth/totp/disable` | staff (self) | `{ code }` → 204. |

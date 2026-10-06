@@ -178,6 +178,8 @@ export interface Person {
     category: StaffCategory;
     photoFileId: string | null;
     isActive: boolean;
+    /** Whether a half day may be marked for them. Not pay. */
+    allowHalfDay: boolean;
 }
 /** One version of a shift. Editing opens a new version from a date. */
 export interface Shift {

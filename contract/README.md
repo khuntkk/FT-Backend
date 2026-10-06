@@ -6,7 +6,7 @@ and any other TypeScript or JavaScript project that talks to StitchFlow.
 | Export | Is |
 | --- | --- |
 | Types | Every shape the API sends or receives (`Machine`, `EntryDraft`, `PayrollRow`, `DeletedItem`, `Me` …) and every enum, as the Dart apps name them. |
-| `ROUTES`, `ApiRoutes` | All 97 endpoints: method, path, the permission action each needs, whether it is destructive; and the request and response type of each. |
+| `ROUTES`, `ApiRoutes` | All 102 endpoints: method, path, the permission action each needs, whether it is destructive; and the request and response type of each. |
 | `ACTIONS`, `MODULES`, `ROLE_DEFAULTS`, `ROLE_CAN_CREATE` | The permission catalog — **generated from the SQL**, so it is the database's own. |
 | `can`, `refusal`, `canCreate`, `canGrant`, `memberLevel`, `memberModules` | The permission rule. Tested against the database's `fn_member_can` for every role, owner flag, status, grant and action. |
 | `ERROR_STATUS`, `ERROR_MEANING` | Every error code and its HTTP status. |
@@ -19,10 +19,10 @@ No runtime dependencies. ES modules.
 
 ## Install
 
-From the bundle (`stitchflow-contract-1.1.0.tgz`):
+From the bundle (`stitchflow-contract-<version>.tgz`):
 
 ```bash
-npm install ./stitchflow-contract-1.1.0.tgz
+npm install ./stitchflow-contract-<version>.tgz
 ```
 
 Or, inside the stitchflow-platform repo, as a workspace package (`"@stitchflow/contract": "workspace:*"`).

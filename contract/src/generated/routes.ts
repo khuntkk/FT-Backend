@@ -585,6 +585,13 @@ export interface ApiRoutes {
     body: T.PlatformLoginInput;
     response: T.TokenPair;
   };
+  /** The signed-in console user: who, which role, two-factor on or not. */
+  "GET /v1/platform/me": {
+    params: {  };
+    query: {  };
+    body: undefined;
+    response: T.PlatformStaffMember;
+  };
   /** Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code. */
   "POST /v1/platform/auth/totp/setup": {
     params: {  };
@@ -1637,6 +1644,17 @@ export const ROUTES: readonly RouteInfo[] = [
     "action": null,
     "auth": "none",
     "platformRole": null,
+    "destructive": false,
+    "ownerOnly": false
+  },
+  {
+    "key": "GET /v1/platform/me",
+    "method": "GET",
+    "path": "/v1/platform/me",
+    "summary": "The signed-in console user: who, which role, two-factor on or not.",
+    "action": null,
+    "auth": "platform",
+    "platformRole": "support",
     "destructive": false,
     "ownerOnly": false
   },

@@ -64,9 +64,10 @@ export const STAFF_COLUMNS = `
 
 /** From staff s: a person without pay, for pickers, slips and attendance. */
 export const PERSON_COLUMNS = `
-  s.id, s.name, s.code, s.category, s.photo_file_id as "photoFileId", s.is_active as "isActive"`;
+  s.id, s.name, s.code, s.category, s.photo_file_id as "photoFileId", s.is_active as "isActive",
+  s.allow_half_day as "allowHalfDay"`;
 
 /** PERSON_COLUMNS as one JSON object, for nesting (e.g. a slip's operators). */
 export const PERSON_JSON = `json_build_object(
   'id', s.id, 'name', s.name, 'code', s.code, 'category', s.category,
-  'photoFileId', s.photo_file_id, 'isActive', s.is_active)`;
+  'photoFileId', s.photo_file_id, 'isActive', s.is_active, 'allowHalfDay', s.allow_half_day)`;

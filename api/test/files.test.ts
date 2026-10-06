@@ -138,3 +138,17 @@ describe('live updates', () => {
     ac.abort();
   });
 });
+
+describe('CORS', () => {
+  it('answers the web admin panel\'s origin, and only it', async () => {
+    const hc = await startHarness({ corsOrigins: ['https://admin.example.com'] });
+    const pre = await hc.app.inject({ method: 'OPTIONS', url: '/v1/platform/properties',
+      headers: { origin: 'https://admin.example.com', 'access-control-request-method': 'GET' } });
+    assert.equal(pre.statusCode, 204);
+    assert.equal(pre.headers['access-control-allow-origin'], 'https://admin.example.com');
+    assert.match(String(pre.headers['access-control-allow-headers']), /authorization/);
+    const other = await hc.app.inject({ method: 'GET', url: '/health', headers: { origin: 'https://evil.example' } });
+    assert.equal(other.headers['access-control-allow-origin'], undefined);
+    await hc.close();
+  });
+});

@@ -54,7 +54,7 @@ function sessionLock(pglite: PGlite) {
   };
 }
 
-export async function startHarness(opts: { storage?: Storage } = {}): Promise<Harness> {
+export async function startHarness(opts: { storage?: Storage; corsOrigins?: string[] } = {}): Promise<Harness> {
   const pglite = await PGlite.create({ extensions: { btree_gist, citext }, parsers: PARSERS });
   await pglite.exec(`set time zone 'UTC'`);
   const acquire = sessionLock(pglite);
@@ -73,7 +73,7 @@ export async function startHarness(opts: { storage?: Storage } = {}): Promise<Ha
     storage: opts.storage,
     config: {
       port: 0, host: '127.0.0.1', databaseUrl: 'pglite', platformDatabaseUrl: 'pglite',
-      jwtSecret: 'test-secret-test-secret-test-secret!', filesDir, supabase: null, runJobs: false,
+      jwtSecret: 'test-secret-test-secret-test-secret!', filesDir, supabase: null, runJobs: false, corsOrigins: opts.corsOrigins ?? [],
       logLevel: 'silent', trustProxy: false,
     },
   });

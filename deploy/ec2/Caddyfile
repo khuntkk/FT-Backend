@@ -1,0 +1,8 @@
+# HTTPS for the API. Caddy gets a Let's Encrypt certificate for API_DOMAIN on
+# first start (ports 80 and 443 must be open and the domain must point here),
+# redirects http to https, and passes everything to the API. Live updates
+# (/v1/events, text/event-stream) are flushed as they are written.
+
+{$API_DOMAIN} {
+	reverse_proxy api:3000
+}

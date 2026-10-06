@@ -107,7 +107,7 @@ describe('staff', () => {
       const ops = await as[who].get('/v1/operators');
       assert.equal(ops.status, 200, who);
       assert.deepEqual(Object.keys(ops.body[0]).sort(),
-        ['category', 'code', 'id', 'isActive', 'name', 'photoFileId']);
+        ['allowHalfDay', 'category', 'code', 'id', 'isActive', 'name', 'photoFileId']);
     }
     const ops = await as.supervisor.get('/v1/operators', { activeOnly: 'true' });
     assert.deepEqual(ops.body.map((s: any) => s.name), ['Dinesh', 'Ramesh', 'Suresh']);
