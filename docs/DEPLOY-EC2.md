@@ -10,6 +10,23 @@ runs two containers from [`deploy/ec2/compose.yaml`](../deploy/ec2/compose.yaml)
 The daily jobs run inside the API (`RUN_JOBS=true`, one instance). Photos go to
 Supabase Storage, so the server keeps nothing that a rebuild would lose.
 
+> **Sydney for now (testing).** Accounts from AWS's simplified sign-up get one
+> region chosen by country, and India gets Asia Pacific (Sydney)
+> `ap-southeast-2`, with no region menu. Using Mumbai needs two permanent
+> changes: upgrading to a paid plan and activating advanced features, which
+> also removes the hard spend limit. Until then the server runs in Sydney.
+> Follow this guide with these differences:
+>
+> - Read "Sydney" wherever it says Mumbai or `ap-south-1`, and skip the
+>   region-menu steps.
+> - Skip the budget in step 1. On the Free plan the account can't be charged.
+> - Expect about 1–2 s per request. Each database round trip between Sydney
+>   and Mumbai takes about 150 ms, and a request makes several. That's fine for
+>   checking features, but don't judge speed from it.
+>
+> To move to Mumbai later, launch a new server there and repeat steps 2–9. The
+> server holds no data. Then terminate the Sydney one and release its IP.
+
 **Cost.** A t4g.small with its public IP and a 20 GiB disk is roughly $15 a
 month. The Free plan's credits ($100 at sign-up, up to $100 more) cover about
 six months. The Free plan ends after 6 months, or sooner if the credits run out.

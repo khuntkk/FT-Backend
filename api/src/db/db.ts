@@ -75,11 +75,14 @@ async function inTransaction<T>(
     await client.query('begin');
     // Per transaction, not per connection: behind a transaction pooler
     // (Supabase's port 6543) each transaction may get a different session.
-    await client.query(`set local time zone 'UTC'`);
-    await client.query(`set local role ${role}`);
-    if (propertyId !== null) {
-      await client.query(`select set_config('app.property_id', $1, true)`, [String(propertyId)]);
-    }
+    // One round trip for all three (set local time zone, role and property):
+    // the API can be far from the database. No property is '', which
+    // fn_current_property() reads as null, the same as never set.
+    await client.query(
+      `select set_config('TimeZone', 'UTC', true), set_config('role', $1, true),
+              set_config('app.property_id', $2, true)`,
+      [role, propertyId === null ? '' : String(propertyId)],
+    );
     const result = await fn(tx);
     await client.query('commit');
     for (const f of onCommit) f();
