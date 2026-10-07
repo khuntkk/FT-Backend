@@ -11,7 +11,7 @@ the source of truth for the schema, the permissions and the contract.
 
 | Path             | Is                                                                                                                             |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `api/`           | The API: Node.js 24 + TypeScript (run directly by Node, no build step), Fastify, `pg`. All 102 routes of the contract (1.3.0). |
+| `api/`           | The API: Node.js 24 + TypeScript (run directly by Node, no build step), Fastify, `pg`. All 102 routes of the contract (1.4.0). |
 | `db/migrations/` | The schema. Applied once each, in order.                                                                                       |
 | `db/views/`      | Views (`vw_*`) and functions (`fn_*`): re-applied on every deploy.                                                             |
 | `db/check/`      | Applies all of it to a throwaway Postgres and checks 100 rules hold.                                                           |

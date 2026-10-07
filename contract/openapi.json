@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "StitchFlow API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "The contract between the StitchFlow apps, the web admin panel and the API. Every operation names the permission action it needs (x-action); a destructive action is super admin only. Dates without a time are \"YYYY-MM-DD\"; instants are ISO-8601 UTC; money is rounded to the paisa. See HANDOVER.md."
   },
   "servers": [
@@ -510,6 +510,26 @@
           "displayName": {
             "type": "string"
           },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What they sign in with, with phone and email: the apps switch to this person by it."
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "E.164, e.g. \"+919812345678\"."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "role": {
             "$ref": "#/components/schemas/UserRole"
           },
@@ -543,6 +563,9 @@
           "id",
           "userId",
           "displayName",
+          "username",
+          "phone",
+          "email",
           "role",
           "isOwner",
           "status",

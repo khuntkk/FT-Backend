@@ -44,6 +44,17 @@ describe('listing users', () => {
     assert.ok(!JSON.stringify(res.body).toLowerCase().includes('password'));
   });
 
+  it('carries each member\'s login, so an app can sign in as them', async () => {
+    const { member, username, password } = await newMember('viewAdmin');
+    const res = await as.admin.get('/v1/users');
+    const listed = res.body.find((m: any) => m.id === member.id);
+    assert.equal(listed.username, username);
+    assert.ok('phone' in listed && 'email' in listed);
+    // What the list says is what signing in takes.
+    const c = await signIn(h, listed.username ?? listed.phone ?? listed.email, password);
+    assert.equal((await c.get('/v1/me')).body.member.id, member.id);
+  });
+
   it('is refused to an operator', async () => {
     const res = await as.worker.get('/v1/users');
     assert.equal(res.status, 403);

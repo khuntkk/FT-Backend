@@ -11,9 +11,14 @@ export const USER_COLUMNS = `
   u.email::text as email, u.status, u.must_change_password as "mustChangePassword",
   u.last_login_at as "lastLoginAt"`;
 
-/** From property_members m join users u. Module levels for every module, disabled members included. */
+/**
+ * From property_members m join users u. Module levels for every module, disabled members included.
+ * Carries the login (username, phone, email) so an app can sign in as the member without asking
+ * for it; never the password hash.
+ */
 export const MEMBER_COLUMNS = `
-  m.id, m.user_id as "userId", u.display_name as "displayName", m.role, m.is_owner as "isOwner",
+  m.id, m.user_id as "userId", u.display_name as "displayName",
+  u.username, u.phone, u.email, m.role, m.is_owner as "isOwner",
   m.status, m.staff_id as "staffId", m.created_at as "createdAt",
   (select json_agg(json_build_object('module', mo.key, 'level', fn_member_level(m.id, mo.key))
                    order by mo.sort_order)

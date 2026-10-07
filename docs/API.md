@@ -204,7 +204,7 @@ Purging items past seven days is a **scheduled job** (daily), not an endpoint an
 ### Users — the property's own logins
 | | | | |
 | --- | --- | --- | --- |
-| GET | `/users` | `users.view` | Members with role, status, `isOwner`, `staffId` and module levels. Never a password hash. |
+| GET | `/users` | `users.view` | Members with role, status, `isOwner`, `staffId`, module levels and the login (`username`, `phone`, `email`, any of them null), so an app can switch to a member without asking which phone they use. Never a password hash. |
 | POST | `/users` | `users.create` | `{ displayName, phone?, email?, username?, role, modules?: { module: level }, staffId? }` → the member and a **temporary password, shown once**. `fn_member_can_create` for the role; `fn_can_grant` for each module (`409 grant_exceeds_granter`). An existing user (same phone) is added as a member instead of created twice. |
 | PATCH | `/users/:memberId/access` | `users.update_access` | `{ modules }`. Only members the caller may manage. |
 | POST | `/users/:memberId/reset-password` | `users.reset_password` | → a temporary password, shown once. Sets `mustChangePassword`. |

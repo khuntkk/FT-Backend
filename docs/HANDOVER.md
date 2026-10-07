@@ -8,6 +8,10 @@ repos fit, the rules that are easy to break, where things stand, and what is
 still open.
 
 Written 6 October 2026, against contract 1.3.0 and migrations 0001–0009.
+Updated 7 October 2026: the API is hosted (§7).
+Updated 8 October 2026: contract 1.4.0 — a `Member` carries the login
+(`username`, `phone`, `email`), so the manager app can switch accounts
+without asking which phone someone uses.
 
 ---
 
@@ -54,7 +58,7 @@ and their shapes. Neither client defines any of them.
 The repo was seeded from the handover kit in the Flutter repo
 (`docs/handover/`, kit 1.1.0). That kit is now history: everything in it that
 matters lives here, and this repo has moved on (migrations 0006–0009,
-contract 1.3.0).
+contract 1.4.0).
 
 ### Changing something both sides see
 
@@ -230,23 +234,55 @@ use it, so keep those routes stable.
 
 ---
 
-## 7. Where things stand (6 October 2026)
+## 7. Where things stand (7 October 2026)
 
-**Built:** all 102 routes of contract 1.3.0 have handlers (3 public, 7
+**Built:** all 102 routes of contract 1.4.0 have handlers (3 public, 7
 session, 72 member, 20 platform). `db/check` passes 100 rules. About 315 API
 tests and 19 contract tests, none needing a database or network. CI
 (`.github/workflows/ci.yml`) runs db/check, contract tests, typecheck and API
 tests on pushes to main/dev.
 
-**Running in development** on Supabase (Mumbai, `ap-south-1`), the API on
-the developer's Mac at port 3000. The dev database holds one console admin
-and **no properties yet** — so nothing can sign in to the apps until a
-property and its owner are created (README step 8, or the web panel).
+### Hosted
 
-**Not committed:** branch `dev` has about 27 modified files — contract 1.3.0
-(`GET /v1/platform/me`), `CORS_ORIGINS`, `allowHalfDay` on operators, the
-docs — and the untracked `api/test/serve.ts`. Commit them before anyone else
-pulls.
+| | |
+| --- | --- |
+| **API** | `https://13-237-211-26.sslip.io` (`/health` → `{"ok":true}`) |
+| **Server** | One AWS EC2 instance, `stitchflow-api`: t4g.small, Ubuntu 24.04, Elastic IP `13.237.211.26`, region **Sydney** (`ap-southeast-2`) |
+| **Containers** | `api` (the `Dockerfile` image, never exposed) and `caddy` (HTTPS on 80/443, Let's Encrypt), from `deploy/ec2/compose.yaml` |
+| **Database and photos** | Supabase, Mumbai (`ap-south-1`) — the **same project** the developer's Mac uses, so both see the same data |
+| **Deploys** | What is on GitHub (`khuntkk/FT-Backend`), not a laptop: push, then on the server `~/stitchflow/deploy/ec2/deploy.sh` (pull, build, migrate, restart; a failed migration leaves the old API serving) |
+| **Daily jobs** | Inside the API (`RUN_JOBS=true`), one instance |
+| **Web admin panel** | **Not hosted.** Run it locally against this API (StitchFlow-Web `HANDOVER.md`). |
+
+Everything to build, run and repair the server is in
+[`DEPLOY-EC2.md`](DEPLOY-EC2.md): launch, secrets, first deploy, the
+everyday commands, troubleshooting. The server holds no data, so it can be
+rebuilt or moved by repeating that guide.
+
+**Temporary on purpose, to change before real users:**
+
+- **Sydney, not Mumbai.** The AWS account is on the Free plan, which allows
+  one region; for India that is Sydney. Every database round trip crosses to
+  Mumbai (~150 ms), so a request takes 1–2 s. Don't judge speed from it.
+  Moving to Mumbai needs a paid plan; then follow the guide in Mumbai and
+  terminate the Sydney server.
+- **`sslip.io`, not a domain.** It turns the IP into a hostname so Caddy can
+  get a certificate. The address is compiled into the apps' builds, so put the
+  API on a real domain (`api.<domain>`) before handing out builds widely —
+  every change of address means a new APK.
+- **One Supabase project for development and the server.** Local experiments
+  change the hosted data. Split them when that starts to matter.
+- **AWS Free plan ends** six months after sign-up, or when the credits run
+  out (about $15/month for this server). Upgrade before then or the account
+  closes (`DEPLOY-EC2.md`, "After six months").
+
+The Flutter apps' builds for sharing point at this address
+(`--dart-define=STITCHFLOW_API=https://13-237-211-26.sslip.io`). A unit and
+its owner exist on it, and the manager app signs in and works against it.
+
+To use the hosted API from a laptop instead of running one, point the
+clients at it: the Flutter app through Settings → Data, the web panel with
+`API_PROXY_TARGET=https://13-237-211-26.sslip.io npm run dev`.
 
 **Security:** an earlier README carried the first console admin's temporary
 password in plain text, and that version is pushed (`ea0f916` on
@@ -272,8 +308,8 @@ repo is or will be shared.
 
 | # | Decision | State |
 | --- | --- | --- |
-| 1 | Where the API runs | **Open.** A container is ready (`Dockerfile`); recommended over Lambda (one process, SSE works, no cold starts). The org standard names Lambda + Python; the owner chose Node. |
-| 2 | Which Postgres | Supabase in development. Production needs point-in-time recovery on and a tested restore. |
+| 1 | Where the API runs | **Decided for now:** one EC2 container host behind Caddy (§7). Still open: Sydney → Mumbai (needs a paid AWS plan), and a real domain. The org standard names Lambda + Python; the owner chose Node and a container. |
+| 2 | Which Postgres | Supabase (Mumbai), shared by development and the hosted API. Production needs point-in-time recovery on, a tested restore, and its own project. |
 | 3 | Photo storage | Supabase Storage, private bucket, signed URLs. |
 | 4 | Sign-in identifier on the floor | Phone + password now; OTP later. |
 | 5 | Custom roles | Not now (§4). |
@@ -289,7 +325,8 @@ repo is or will be shared.
 
 | For | Read |
 | --- | --- |
-| Setup, env, deploy | [`README.md`](../README.md), `.env.example` |
+| Setup, env | [`README.md`](../README.md), `.env.example` |
+| The hosted server | [`DEPLOY-EC2.md`](DEPLOY-EC2.md), `deploy/ec2/` |
 | Every endpoint and its permission | [`docs/API.md`](API.md), `contract/spec/` |
 | The contract package | [`contract/README.md`](../contract/README.md) |
 | Permissions | `db/migrations/0003_access_catalog.sql`, `db/views/20_fn_access.sql` |

@@ -113,6 +113,11 @@ export interface Member {
     /** Server-issued id. */
     userId: number;
     displayName: string;
+    /** What they sign in with, with phone and email: the apps switch to this person by it. */
+    username: string | null;
+    /** E.164, e.g. "+919812345678". */
+    phone: string | null;
+    email: string | null;
     role: UserRole;
     /** The property's main super admin. */
     isOwner: boolean;
