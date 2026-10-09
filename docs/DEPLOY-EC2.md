@@ -20,12 +20,19 @@ Supabase Storage, so the server keeps nothing that a rebuild would lose.
 > - Read "Sydney" wherever it says Mumbai or `ap-south-1`, and skip the
 >   region-menu steps.
 > - Skip the budget in step 1. On the Free plan the account can't be charged.
-> - Expect about 1–2 s per request. Each database round trip between Sydney
->   and Mumbai takes about 150 ms, and a request makes several. That's fine for
->   checking features, but don't judge speed from it.
+> - The Supabase project is in Sydney too, so the API and its database sit
+>   together. A server in Sydney with the database in Mumbai made every request
+>   take 2–3 s; together, the API answers in about 20 ms. Requests from India
+>   still take about 0.4 s each way to Sydney.
+> - A local API on a laptop in India pays that 0.4 s for each database round
+>   trip, about 1.3 s per request. For speed, point the apps at the server.
 >
-> To move to Mumbai later, launch a new server there and repeat steps 2–9. The
-> server holds no data. Then terminate the Sydney one and release its IP.
+> To move to Mumbai later, move both together:
+>
+> 1. Create a Supabase project in Mumbai and copy the database into it.
+> 2. Launch a new server in Mumbai and repeat steps 2–9. The server itself
+>    holds no data.
+> 3. Terminate the Sydney server and release its IP.
 
 **Cost.** A t4g.small with its public IP and a 20 GiB disk is roughly $15 a
 month. The Free plan's credits ($100 at sign-up, up to $100 more) cover about
@@ -257,6 +264,7 @@ Run all of these on the server, from `~/stitchflow/deploy/ec2`.
 | Caddy logs (certificates) | `docker compose logs caddy`                                 |
 | Restart the API           | `docker compose restart api`                                |
 | After editing `.env`      | `docker compose up -d --force-recreate api`                 |
+| After editing `Caddyfile` | `docker compose up -d --force-recreate caddy` (a plain reload can see a stale bind-mounted file) |
 | Run the daily jobs now    | `docker compose exec api node src/jobs/run.ts`              |
 | Disk use                  | `df -h /` and `docker system df`                            |
 

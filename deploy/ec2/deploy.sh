@@ -5,7 +5,9 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 git -C ../.. pull --ff-only
-docker compose build api
+# --pull / pull: pick up patched base images (Node, Caddy) on every deploy.
+docker compose pull caddy
+docker compose build --pull api
 # Migrations run as the schema owner (MIGRATION_DATABASE_URL) before the new
 # API starts; a failed migration stops the deploy with the old API still up.
 docker compose run --rm --no-deps api node src/db/migrate.ts

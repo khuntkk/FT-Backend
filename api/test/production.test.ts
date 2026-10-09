@@ -51,7 +51,7 @@ after(() => h.close());
 
 describe('recording a slip', () => {
   it('works out the bonus on the server, ignoring the app\'s preview', async () => {
-    const res = await as.worker.put('/v1/production/entry', draft({
+    const res = await as.admin.put('/v1/production/entry', draft({
       bonusAmount: 9999, karigars: [{ staffId: ravi, isHalfDay: false }, { staffId: sita, isHalfDay: true }],
     }));
     assert.equal(res.status, 200);
@@ -77,23 +77,23 @@ describe('recording a slip', () => {
   });
 
   it('pays the head-loss rule when head loss is ticked', async () => {
-    const res = await as.worker.put('/v1/production/entry', draft({ machineId: m[3], hasHeadLoss: true }));
+    const res = await as.admin.put('/v1/production/entry', draft({ machineId: m[3], hasHeadLoss: true }));
     assert.equal(res.body.entry.bonusAmount, 80);
   });
 
   it('pays a stitch-based slip at the settings rate, only while it is switched on', async () => {
     const slip = draft({ machineId: m[3], shiftId: night, isStitchBased: true });
-    assert.equal((await as.worker.put('/v1/production/entry', slip)).body.entry.bonusAmount, 0);
+    assert.equal((await as.admin.put('/v1/production/entry', slip)).body.entry.bonusAmount, 0);
     await h.sql(`update property_settings set stitch_based_enabled = true, stitch_based_rate_per_thousand = 0.8
                  where property_id = $1`, [p.propertyId]);
-    const res = await as.worker.put('/v1/production/entry', slip);
+    const res = await as.admin.put('/v1/production/entry', slip);
     assert.equal(res.body.entry.bonusAmount, 144, '180k x 0.8, not the rule\'s 270');
     assert.equal(res.body.entry.isStitchBased, true);
   });
 
   it('saving the slot again overwrites it and replaces its operators', async () => {
     const first = await as.worker.get('/v1/production/entry', { machineId: String(m[1]), date: '2026-09-10', shiftId: String(day) });
-    const res = await as.worker.put('/v1/production/entry', draft({
+    const res = await as.admin.put('/v1/production/entry', draft({
       totalStitches: 50000, karigars: [{ staffId: mohan, isHalfDay: false }],
     }));
     assert.equal(res.body.entry.id, first.body.entry.id);
@@ -180,7 +180,7 @@ describe('deleting a slip', () => {
     const [binned] = await h.sql(`select deleted_at, deleted_batch from production_entries where id = $1`, [slip.entry.id]);
     assert.ok(binned.deleted_at && binned.deleted_batch, 'soft deleted, with a batch for the bin');
 
-    const res = await as.worker.put('/v1/production/entry', draft({ machineId: m[2], totalStitches: 10000 }));
+    const res = await as.admin.put('/v1/production/entry', draft({ machineId: m[2], totalStitches: 10000 }));
     assert.equal(res.body.entry.id, slip.entry.id, 'the binned row is brought back');
     assert.equal(res.body.entry.bonusAmount, 10, 'and worked out afresh, no longer manual');
     assert.deepEqual(res.body.karigars.map((k: any) => k.staff.id), [ravi]);

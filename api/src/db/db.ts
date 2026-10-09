@@ -48,7 +48,21 @@ export interface Db {
 }
 
 export function createPool(url: string, max = 10): pg.Pool {
-  return new pg.Pool({ ...pgOptions(url), max });
+  const pool = new pg.Pool({
+    ...pgOptions(url),
+    max,
+    // Warm connections matter: a fresh TCP + TLS + SCRAM connect to a far database is slow.
+    idleTimeoutMillis: 600_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    query_timeout: 20_000,
+    maxLifetimeSeconds: 3600,
+    application_name: 'stitchflow-api',
+  });
+  // Without a listener, an idle connection dropped by the pooler would crash the process.
+  pool.on('error', (e) => console.error('database pool: idle connection error:', e.message));
+  return pool;
 }
 
 /** One connection, held for a transaction. pg's PoolClient is one. */
@@ -72,16 +86,20 @@ async function inTransaction<T>(
     afterCommit: (f) => void onCommit.push(f),
   };
   try {
-    await client.query('begin');
     // Per transaction, not per connection: behind a transaction pooler
     // (Supabase's port 6543) each transaction may get a different session.
-    // One round trip for all three (set local time zone, role and property):
-    // the API can be far from the database. No property is '', which
+    // ONE parameterless round trip opens the transaction and sets time zone,
+    // role, property and the server-side limits (the API can be far from the
+    // database). Role is one of two literals and the property id a validated
+    // integer, so escaping them is safe. No property is '', which
     // fn_current_property() reads as null, the same as never set.
+    if (propertyId !== null && !Number.isSafeInteger(propertyId)) throw new Error('propertyId must be an integer.');
     await client.query(
-      `select set_config('TimeZone', 'UTC', true), set_config('role', $1, true),
-              set_config('app.property_id', $2, true)`,
-      [role, propertyId === null ? '' : String(propertyId)],
+      `begin; select set_config('TimeZone', 'UTC', true), set_config('role', ${pg.escapeLiteral(role)}, true),
+              set_config('app.property_id', ${pg.escapeLiteral(propertyId === null ? '' : String(propertyId))}, true),
+              set_config('statement_timeout', '15000', true),
+              set_config('idle_in_transaction_session_timeout', '20000', true),
+              set_config('lock_timeout', '3000', true)`,
     );
     const result = await fn(tx);
     await client.query('commit');

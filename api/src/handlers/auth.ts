@@ -3,7 +3,7 @@ import { ApiError, errorBody } from '../http/errors.ts';
 import { requireMember } from '../http/router.ts';
 import type { PublicHandlers, SessionHandlers } from '../http/types.ts';
 import * as auth from '../services/auth.ts';
-import { getMember, getProperty, getSettings, getUser } from '../services/shapes.ts';
+import { getMe } from '../services/shapes.ts';
 
 const device = (ua: string | undefined) => ua ?? null;
 
@@ -28,18 +28,10 @@ export const sessionAuth: SessionHandlers<
     await auth.logout(c.tx, c.claims.sub, c.body.refreshToken, c.query.everywhere === true);
   },
   'POST /v1/auth/change-password': async (c) => {
-    await auth.changePassword(c.tx, c.claims.sub, c.body.current, c.body.next);
+    await auth.changePassword(c.tx, c.claims.sub, c.claims.sid, c.body.current, c.body.next);
   },
   'GET /v1/me': async (c): Promise<Me> => {
     const m = requireMember(c.member);
-    const member = (await getMember(c.tx, m.memberId))!;
-    return {
-      user: (await getUser(c.tx, m.userId))!,
-      member,
-      property: (await getProperty(c.tx, m.propertyId))!,
-      settings: (await getSettings(c.tx, m.propertyId))!,
-      modules: member.modules,
-    };
+    return getMe(c.tx, m.userId, m.memberId, m.propertyId);
   },
 };
-

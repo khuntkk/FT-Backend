@@ -54,7 +54,7 @@ describe('a unit cannot take over a login it shares', () => {
 });
 
 describe('only members who may see pay type a bonus by hand', () => {
-  let slot: Record<string, unknown>;
+  let slot: any;
   before(async () => {
     const [{ id: machineId }] = await h.sql(`insert into machines (property_id, number) values ($1, 1) returning id`, [a.propertyId]);
     const [{ id: shiftId }] = await h.sql(`select id from shifts where property_id = $1 order by sort_order limit 1`, [a.propertyId]);
@@ -70,15 +70,60 @@ describe('only members who may see pay type a bonus by hand', () => {
   it('ignores a worker\'s hand-typed bonus', async () => {
     const res = await asA.worker.put('/v1/production/entry', { ...slot, bonusAmount: 50000, bonusIsManual: true });
     assert.equal(res.status, 200);
-    assert.equal(res.body.entry.bonusAmount, 0);
-    assert.equal(res.body.entry.bonusIsManual, false);
+    const seen = (await asA.admin.get('/v1/production/entry', {
+      machineId: String(slot.machineId), date: slot.workDate, shiftId: String(slot.shiftId) })).body;
+    assert.equal(seen.entry.bonusAmount, 0);
+    assert.equal(seen.entry.bonusIsManual, false);
   });
 
   it('keeps an admin\'s hand-typed bonus when a supervisor saves the slip again', async () => {
     await asA.admin.put('/v1/production/entry', { ...slot, bonusAmount: 300, bonusIsManual: true });
     const res = await asA.supervisor.put('/v1/production/entry', { ...slot, totalStitches: 10, bonusAmount: 9999, bonusIsManual: true });
-    assert.equal(res.body.entry.bonusAmount, 300);
-    assert.equal(res.body.entry.bonusIsManual, true);
+    assert.equal(res.status, 200);
+    const seen = (await asA.admin.get('/v1/production/entry', {
+      machineId: String(slot.machineId), date: slot.workDate, shiftId: String(slot.shiftId) })).body;
+    assert.equal(seen.entry.bonusAmount, 300);
+    assert.equal(seen.entry.bonusIsManual, true);
+  });
+
+  it('masks the bonus on every slip read and the save response, but not for an admin', async () => {
+    const q = { machineId: String(slot.machineId), date: slot.workDate, shiftId: String(slot.shiftId) };
+    const staffId = slot.karigars[0].staffId;
+    const masked = (e: any) => {
+      assert.equal(e.entry.bonusAmount, null);
+      assert.equal(e.entry.bonusIsManual, false);
+      assert.equal(e.bonusPerKarigar, null);
+    };
+    for (const who of [asA.supervisor, asA.worker]) {
+      const put = await who.put("/v1/production/entry", { ...slot, bonusAmount: 0, bonusIsManual: false }); assert.equal(put.status, 200, JSON.stringify(put.body)); masked(put.body);
+      masked((await who.get('/v1/production/entry', q)).body);
+      masked((await who.get('/v1/production/day', { date: slot.workDate, shiftId: q.shiftId })).body
+        .find((d: any) => d.entry).entry);
+      const list = (await who.get('/v1/production/entries', { from: slot.workDate, to: slot.workDate, staffId: String(staffId) })).body;
+      assert.ok(list.items.length > 0);
+      list.items.forEach(masked);
+    }
+    const real = (await asA.admin.get('/v1/production/entry', q)).body;
+    assert.equal(real.entry.bonusAmount, 300);
+    assert.equal(real.bonusPerKarigar, 300);
+    const day = (await asA.admin.get('/v1/production/day', { date: slot.workDate, shiftId: q.shiftId })).body.find((d: any) => d.entry);
+    assert.equal(day.entry.entry.bonusAmount, 300);
+  });
+});
+
+describe('/v1/me settings', () => {
+  it('nulls the pay rates for a member who may not see settings or pay', async () => {
+    await h.sql(`update property_settings set no_leave_bonus_amount = 700, stitch_based_rate_per_thousand = 0.9 where property_id = $1`,
+      [a.propertyId]);
+    for (const who of [asA.supervisor, asA.worker]) {
+      const me = (await who.get('/v1/me')).body;
+      assert.equal(me.settings.noLeaveBonusAmount, null);
+      assert.equal(me.settings.stitchBasedRatePerThousand, null);
+    }
+    const me = (await asA.admin.get('/v1/me')).body;
+    assert.equal(me.settings.noLeaveBonusAmount, 700);
+    assert.equal(me.settings.stitchBasedRatePerThousand, 0.9);
+    assert.equal((await asA.admin.get('/v1/settings')).body.noLeaveBonusAmount, 700);
   });
 });
 

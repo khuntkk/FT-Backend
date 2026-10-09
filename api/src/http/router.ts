@@ -12,15 +12,20 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ROUTES, refusal, type ActionKey, type RouteInfo } from '@stitchflow/contract';
 import { verifyAccessToken, type AccessClaims } from '../auth/tokens.ts';
 import type { Db, Tx } from '../db/db.ts';
+import { signInPreflight, identifierColumn } from '../services/rateLimit.ts';
 import { ApiError } from './errors.ts';
 import { arrayQueryParams, routeSchema } from './schemas.ts';
 import type { AnyHandler, AuditNote, Member, PlatformStaff, Services } from './types.ts';
+
+/** Per-IP requests a minute on the unauthenticated POST routes. */
+const UNAUTH_MAX_PER_MINUTE = 120;
 
 export function registerRoutes(
   app: FastifyInstance,
   db: Db,
   services: Services,
   handlers: Record<string, AnyHandler>,
+  unauthLimit = UNAUTH_MAX_PER_MINUTE,
 ): void {
   for (const route of ROUTES) {
     const handler = handlers[route.key];
@@ -29,6 +34,11 @@ export function registerRoutes(
       url: route.path,
       schema: routeSchema(route),
       preValidation: splitArrayQuery(route),
+      // The unauthenticated POSTs (sign-in, refresh) get a per-IP limit; the
+      // plugin is registered with global: false (app.ts).
+      ...(route.auth === 'none' && route.method === 'POST' && {
+        config: { rateLimit: { max: unauthLimit, timeWindow: '1 minute' } },
+      }),
       handler: async (req, reply) => {
         if (!handler) {
           return reply.code(501).send({ error: { code: 'not_implemented', message: `${route.key} is not built yet.` } });
@@ -74,6 +84,25 @@ function bearer(req: FastifyRequest, secret: string): AccessClaims {
   return verifyAccessToken(h.slice(7), secret);
 }
 
+/** What a console session without two-factor may still call, when it is required (/v1/auth/* is not a platform route). */
+const TOTP_SETUP_ROUTES = new Set([
+  'GET /v1/platform/me', 'POST /v1/platform/auth/totp/setup', 'POST /v1/platform/auth/totp/enable',
+]);
+
+/** The identifier and password a sign-in body carries, or null (refresh). */
+function signInIdentifier(route: RouteInfo, body: unknown) {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const password = typeof b.password === 'string' ? b.password : '';
+  if (route.key === 'POST /v1/platform/auth/login' && typeof b.email === 'string') {
+    return { column: 'email', value: b.email.trim(), password };
+  }
+  if (route.key === 'POST /v1/auth/login' && typeof b.identifier === 'string') {
+    const value = b.identifier.trim();
+    return { column: identifierColumn(value), value, password };
+  }
+  return null;
+}
+
 async function dispatch(
   route: RouteInfo,
   handler: AnyHandler,
@@ -95,6 +124,11 @@ async function dispatch(
   const isPlatformPath = route.path.startsWith('/v1/platform/');
 
   if (route.auth === 'none') {
+    if (route.method === 'POST') {
+      // Limits first, before a connection is taken: a refused request costs no round trip.
+      const wait = signInPreflight(signInIdentifier(route, req.body), req.ip);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    }
     const run = (tx: Tx) => handler({ ...base, tx });
     return isPlatformPath ? db.platform(run) : db.api(null, run);
   }
@@ -104,7 +138,10 @@ async function dispatch(
   if (route.auth === 'platform') {
     if (claims.client !== 'webAdmin' || !claims.prole) throw new ApiError('forbidden', 'Console staff only.');
     return db.platform(async (tx) => {
-      const staff = await loadStaff(tx, claims.sub);
+      const staff = await loadStaff(tx, claims.sub, claims.sid);
+      if (services.config.requirePlatformTotp && !staff.totpOn && !TOTP_SETUP_ROUTES.has(route.key)) {
+        throw new ApiError('forbidden', 'Turn on two-factor sign-in first.', { reason: 'totpSetupRequired' });
+      }
       if (route.platformRole === 'admin' && staff.role !== 'admin') {
         throw new ApiError('forbidden', 'Console admins only.', { platformRole: 'admin' });
       }
@@ -121,7 +158,7 @@ async function dispatch(
   }
 
   return db.api(claims.pid, async (tx) => {
-    const member = claims.mid ? await loadMember(tx, claims) : null;
+    const member = claims.mid ? await loadMember(tx, claims, route.action ?? null) : null;
     const assertCan = (action: ActionKey) => checkAction(tx, member, action);
     if (member) gate(member, route);
 
@@ -132,7 +169,7 @@ async function dispatch(
 
     // route.auth === 'member'
     const m = requireMember(member);
-    await checkAction(tx, m, route.action!);
+    refuseUnless(m, route.action!);
 
     const key = req.headers['idempotency-key'];
     const idempotent = typeof key === 'string' && route.method !== 'GET';
@@ -165,7 +202,12 @@ const MEMBER_SQL = `
          u.must_change_password as "mustChangePassword",
          p.status as "propertyStatus", p.timezone, p.code::text as "propertyCode",
          coalesce((select json_object_agg(g.module, g.level)
-                   from member_module_access g where g.member_id = m.id), '{}'::json) as grants
+                   from member_module_access g where g.member_id = m.id), '{}'::json) as grants,
+         fn_member_can(m.id, $4::text) as allowed,
+         fn_member_can(m.id, 'payroll.view') as "canSeePay",
+         -- the token's family still has a live session (refresh rotates the row, so not its own id)
+         exists (select 1 from auth_sessions cur join auth_sessions own on own.family_id = cur.family_id
+                 where own.id = $5::uuid and own.user_id = m.user_id and cur.revoked_at is null) as "sessionLive"
   from property_members m
   join users u on u.id = m.user_id
   join properties p on p.id = m.property_id
@@ -177,10 +219,16 @@ export function requireMember(member: Member | null): Member {
   return member;
 }
 
-async function loadMember(tx: Tx, claims: AccessClaims): Promise<Member> {
-  const m = await tx.one<Member>(MEMBER_SQL, [claims.mid, claims.sub, claims.pid]);
+async function loadMember(tx: Tx, claims: AccessClaims, action: ActionKey | null): Promise<Member> {
+  const m = await tx.one<Member & { allowed: boolean | null; sessionLive: boolean }>(
+    MEMBER_SQL, [claims.mid, claims.sub, claims.pid, action, claims.sid]);
   // Gone, or switched off: the app should sign out.
   if (!m || m.memberStatus !== 'active' || m.userStatus !== 'active') {
+    throw new ApiError('unauthenticated', 'This sign-in is no longer valid.');
+  }
+  // After the status gate's first answer: a suspended unit ends its sessions too, and
+  // its members should hear property_suspended, not a bare sign-out.
+  if (!m.sessionLive && m.propertyStatus === 'active') {
     throw new ApiError('unauthenticated', 'This sign-in is no longer valid.');
   }
   return m;
@@ -205,7 +253,12 @@ async function gatePasswordForUser(tx: Tx, userId: number, route: RouteInfo): Pr
 async function checkAction(tx: Tx, member: Member | null, action: ActionKey): Promise<void> {
   if (!member) throw new ApiError('forbidden', 'Choose a property first.', { reason: 'noPropertySelected' });
   const row = await tx.one<{ allowed: boolean }>(`select fn_member_can($1, $2) as allowed`, [member.memberId, action]);
-  if (row?.allowed) return;
+  refuseUnless(member, action, row?.allowed);
+}
+
+/** Throws the 403 that explains a "no" (the flag is fn_member_can's answer, already in the member row by default). */
+function refuseUnless(member: Member, action: ActionKey, allowed: boolean | null | undefined = (member as any).allowed): void {
+  if (allowed) return;
   const code = refusal({
     role: member.role,
     isOwner: member.isOwner,
@@ -217,15 +270,17 @@ async function checkAction(tx: Tx, member: Member | null, action: ActionKey): Pr
   throw new ApiError(code, `Not allowed: ${action}.`, { action });
 }
 
-async function loadStaff(tx: Tx, userId: number): Promise<PlatformStaff> {
-  const s = await tx.one<PlatformStaff & { status: string; must_change_password: boolean }>(
-    `select ps.user_id as "userId", ps.role, u.status, u.must_change_password
+async function loadStaff(tx: Tx, userId: number, sid: string): Promise<PlatformStaff & { totpOn: boolean }> {
+  const s = await tx.one<PlatformStaff & { status: string; must_change_password: boolean; sessionLive: boolean; totpOn: boolean }>(
+    `select ps.user_id as "userId", ps.role, ps.totp_enabled_at is not null as "totpOn", u.status, u.must_change_password,
+            exists (select 1 from auth_sessions cur join auth_sessions own on own.family_id = cur.family_id
+                    where own.id = $2::uuid and own.user_id = ps.user_id and cur.revoked_at is null) as "sessionLive"
      from platform_staff ps join users u on u.id = ps.user_id where ps.user_id = $1`,
-    [userId],
+    [userId, sid],
   );
-  if (!s || s.status !== 'active') throw new ApiError('unauthenticated', 'This sign-in is no longer valid.');
+  if (!s || s.status !== 'active' || !s.sessionLive) throw new ApiError('unauthenticated', 'This sign-in is no longer valid.');
   if (s.must_change_password) throw new ApiError('password_change_required', 'Change the temporary password first.');
-  return { userId: s.userId, role: s.role };
+  return { userId: s.userId, role: s.role, totpOn: s.totpOn };
 }
 
 /** Claims the key, or returns the response already stored under it. */

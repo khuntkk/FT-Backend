@@ -12,12 +12,16 @@ services:
       context: ../..
     image: stitchflow-api
     restart: unless-stopped
+    # Heap capped under the container limit so Node collects before the kernel kills it.
+    mem_limit: 768m
+    memswap_limit: 768m
     env_file: ../../.env
     environment:
       HOST: 0.0.0.0
       PORT: "3000"
       # Caddy is the only way in, so its X-Forwarded-* headers are trusted.
       TRUST_PROXY: "true"
+      NODE_OPTIONS: --max-old-space-size=384
     volumes:
       # DATABASE_CA_FILE=certs/supabase-ca.crt resolves to /app/certs.
       - ../../certs:/app/certs:ro

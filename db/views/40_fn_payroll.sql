@@ -58,7 +58,7 @@ returns table (
   payment_id           bigint
 )
 language sql stable as $$
-  with bounds as (
+  with bounds as not materialized (
     select date_trunc('month', p_month)::date as start_on,
            (date_trunc('month', p_month) + interval '1 month')::date as end_on
   ),

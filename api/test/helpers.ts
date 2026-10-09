@@ -19,7 +19,7 @@ import { EventBus } from '../src/http/events.ts';
 import type { Storage } from '../src/storage/storage.ts';
 import { migrate } from '../src/db/migrate.ts';
 import { hashPassword } from '../src/auth/passwords.ts';
-import { signInByIdentifier, signInByIp } from '../src/services/rateLimit.ts';
+import { clearSignInLimits } from '../src/services/rateLimit.ts';
 
 export const PASSWORD = 'correct-horse-9';
 
@@ -54,7 +54,7 @@ function sessionLock(pglite: PGlite) {
   };
 }
 
-export async function startHarness(opts: { storage?: Storage; corsOrigins?: string[] } = {}): Promise<Harness> {
+export async function startHarness(opts: { storage?: Storage; corsOrigins?: string[]; unauthLimit?: number; requirePlatformTotp?: boolean } = {}): Promise<Harness> {
   const pglite = await PGlite.create({ extensions: { btree_gist, citext }, parsers: PARSERS });
   await pglite.exec(`set time zone 'UTC'`);
   const acquire = sessionLock(pglite);
@@ -71,14 +71,15 @@ export async function startHarness(opts: { storage?: Storage; corsOrigins?: stri
     db,
     events,
     storage: opts.storage,
+    // Tests sign in far more than 30 times a minute from one address.
+    unauthLimit: opts.unauthLimit ?? 100_000,
     config: {
       port: 0, host: '127.0.0.1', databaseUrl: 'pglite', platformDatabaseUrl: 'pglite',
       jwtSecret: 'test-secret-test-secret-test-secret!', filesDir, supabase: null, runJobs: false, corsOrigins: opts.corsOrigins ?? [],
-      logLevel: 'silent', trustProxy: false,
+      logLevel: 'silent', trustProxy: false, requirePlatformTotp: opts.requirePlatformTotp ?? false,
     },
   });
-  signInByIdentifier.clear();
-  signInByIp.clear();
+  clearSignInLimits();
   return {
     app,
     events,

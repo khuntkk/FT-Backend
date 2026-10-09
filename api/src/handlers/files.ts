@@ -16,12 +16,11 @@ export const fileHandlers: SessionHandlers<'POST /v1/files' | 'GET /v1/files/:fi
     if (!c.req.isMultipart()) {
       throw new ApiError('validation_failed', 'Send multipart/form-data.', { fields: { body: 'multipart' } });
     }
-    let purpose: string | undefined;
-    let bytes: Buffer | undefined;
-    for await (const part of c.req.parts()) {
-      if (part.type === 'file') bytes = await part.toBuffer();
-      else if (part.fieldname === 'purpose') purpose = String(part.value);
-    }
+    // @fastify/multipart (attachFieldsToBody: 'keyValues') has read the body
+    // before the transaction opened: fields are strings, the file a Buffer.
+    const body = (c.req.body ?? {}) as { purpose?: unknown; file?: unknown };
+    const purpose = typeof body.purpose === 'string' ? body.purpose : undefined;
+    const bytes = Buffer.isBuffer(body.file) ? body.file : undefined;
     if (!purpose || !PURPOSES.includes(purpose)) {
       throw new ApiError('validation_failed', 'purpose is machinePhoto, staffPhoto or slipPhoto.', {
         fields: { purpose: 'required' },

@@ -29,6 +29,8 @@ export interface Member {
   timezone: string;
   propertyCode: string;
   grants: Record<string, 'none' | 'view' | 'edit'>;
+  /** fn_member_can(payroll.view): may this member see pay figures. */
+  canSeePay: boolean;
 }
 
 export interface PlatformStaff {

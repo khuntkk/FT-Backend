@@ -25,6 +25,8 @@ export interface Config {
   trustProxy: boolean;
   /** Browser origins allowed to call the API (the web admin panel's), e.g. https://admin.example.com. */
   corsOrigins: string[];
+  /** Console staff must have two-factor on to use the console (default: in production). */
+  requirePlatformTotp: boolean;
 }
 
 function required(name: string): string {
@@ -48,6 +50,7 @@ export function loadConfig(): Config {
     runJobs: process.env.RUN_JOBS !== 'false',
     logLevel: process.env.LOG_LEVEL ?? 'info',
     trustProxy: process.env.TRUST_PROXY === 'true',
+    requirePlatformTotp: (process.env.REQUIRE_PLATFORM_TOTP ?? String(process.env.NODE_ENV === 'production')) === 'true',
     corsOrigins: (process.env.CORS_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   };
 }
@@ -64,16 +67,19 @@ function supabaseFromEnv(): Config['supabase'] {
  * Connection options for a database URL. TLS unless the database is on this
  * machine: DATABASE_SSL=verify checks the server's certificate against
  * DATABASE_CA_FILE (Supabase: Database settings → SSL → download), `require`
- * encrypts without checking it, `off` is plain. An sslmode in the URL is
+ * encrypts without checking it, `off` is plain. A remote host defaults to verify. An sslmode in the URL is
  * dropped: pg would let it override these.
  */
 export function pgOptions(url: string): { connectionString: string; ssl?: object | false } {
   const u = new URL(url);
   u.searchParams.delete('sslmode');
   const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(u.hostname);
-  const mode = process.env.DATABASE_SSL || (local ? 'off' : 'require');
+  const mode = process.env.DATABASE_SSL || (local ? 'off' : 'verify');
   if (mode === 'off') return { connectionString: u.toString(), ssl: false };
-  if (mode === 'require') return { connectionString: u.toString(), ssl: { rejectUnauthorized: false } };
+  if (mode === 'require') {
+    if (!local) process.emitWarning('DATABASE_SSL=require encrypts but does not verify the database certificate; use verify.');
+    return { connectionString: u.toString(), ssl: { rejectUnauthorized: false } };
+  }
   if (mode !== 'verify') throw new Error('DATABASE_SSL is off, require or verify.');
   const caFile = process.env.DATABASE_CA_FILE;
   if (!caFile) throw new Error('DATABASE_SSL=verify needs DATABASE_CA_FILE.');

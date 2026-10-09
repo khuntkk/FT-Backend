@@ -85,7 +85,7 @@ describe('files', () => {
     assert.equal(raw.headers['content-type'], 'image/png');
     assert.deepEqual(raw.rawPayload, png());
 
-    const tampered = await h.app.inject({ method: 'GET', url: signed.pathname + signed.search.replace(/sig=./, 'sig=x') });
+    const tampered = await h.app.inject({ method: 'GET', url: signed.pathname + signed.search.replace(/sig=(.)/, (_m, c) => `sig=${c === 'x' ? 'y' : 'x'}`) });
     assert.equal(tampered.statusCode, 403);
   });
 
@@ -113,7 +113,7 @@ describe('files', () => {
 describe('live updates', () => {
   it('tells listeners in the property which rows changed, after commit only', async () => {
     const heard: unknown[] = [];
-    const stop = h.events.listen(p.propertyId, (n) => heard.push(n));
+    const stop = h.events.listen(p.propertyId, { memberId: 0, tables: new Set(['machines']) }, (n) => heard.push(n));
     const res = await as.admin.post('/v1/machines', { number: 41 });
     assert.deepEqual(heard, [{ table: 'machines', ids: [res.body.id] }]);
     // Refused (taken number): rolled back, so nobody hears of it.
@@ -135,6 +135,35 @@ describe('live updates', () => {
     const made = await as.admin.post('/v1/machines', { number: 42 });
     const { value } = await reader.read();
     assert.match(new TextDecoder().decode(value), new RegExp(`event: change\\ndata: \\{"table":"machines","ids":\\[${made.body.id}\\]\\}`));
+    ac.abort();
+  });
+
+  it('sends a worker only the tables they may view, and ends a disabled member\'s stream', async () => {
+    const address = `http://127.0.0.1:${(h.app.server.address() as any).port}`;
+    const ac = new AbortController();
+    const res = await fetch(`${address}/v1/events`, {
+      headers: { authorization: `Bearer ${as.worker.token}` }, signal: ac.signal,
+    });
+    const reader = res.body!.getReader();
+    await reader.read(); // ": connected"
+    const [{ id: staffId }] = await h.sql(
+      `insert into staff (property_id, name, category) values ($1, 'Evt', 'karigar') returning id`, [p.propertyId]);
+    assert.equal((await as.admin.post('/v1/advances', { staffId, givenOn: '2026-09-01', amount: 10, mode: 'cash' })).status, 200);
+    const made = await as.admin.post('/v1/machines', { number: 43 });
+    const { value } = await reader.read();
+    const text = new TextDecoder().decode(value);
+    assert.doesNotMatch(text, /advances/);
+    assert.match(text, new RegExp(`"table":"machines","ids":\\[${made.body.id}\\]`));
+
+    const off = await as.admin.post(`/v1/users/${p.members.worker.memberId}/disable`);
+    assert.equal(off.status, 200);
+    let ended = '';
+    for (;;) {
+      const r = await reader.read();
+      if (r.done) break;
+      ended += new TextDecoder().decode(r.value);
+    }
+    assert.match(ended, /event: bye/);
     ac.abort();
   });
 });

@@ -246,7 +246,7 @@ tests on pushes to main/dev.
 
 | | |
 | --- | --- |
-| **API** | `https://13-237-211-26.sslip.io` (`/health` → `{"ok":true}`) |
+| **API** | `https://stitchflowapi.bytewrench.tools` (`/health` → `{"ok":true}`) |
 | **Server** | One AWS EC2 instance, `stitchflow-api`: t4g.small, Ubuntu 24.04, Elastic IP `13.237.211.26`, region **Sydney** (`ap-southeast-2`) |
 | **Containers** | `api` (the `Dockerfile` image, never exposed) and `caddy` (HTTPS on 80/443, Let's Encrypt), from `deploy/ec2/compose.yaml` |
 | **Database and photos** | Supabase, Mumbai (`ap-south-1`) — the **same project** the developer's Mac uses, so both see the same data |
@@ -266,10 +266,12 @@ rebuilt or moved by repeating that guide.
   Mumbai (~150 ms), so a request takes 1–2 s. Don't judge speed from it.
   Moving to Mumbai needs a paid plan; then follow the guide in Mumbai and
   terminate the Sydney server.
-- **`sslip.io`, not a domain.** It turns the IP into a hostname so Caddy can
-  get a certificate. The address is compiled into the apps' builds, so put the
-  API on a real domain (`api.<domain>`) before handing out builds widely —
-  every change of address means a new APK.
+- **The domain** is `stitchflowapi.bytewrench.tools` (an A record to the
+  Elastic IP; Caddy's Let's Encrypt certificate). It replaced
+  `13-237-211-26.sslip.io` by 10 October 2026; builds made before then point
+  at the old address and no longer connect. The address is compiled into the
+  apps, so any further change means new APKs — keep this name, and if the
+  server moves, move the A record rather than the name.
 - **One Supabase project for development and the server.** Local experiments
   change the hosted data. Split them when that starts to matter.
 - **AWS Free plan ends** six months after sign-up, or when the credits run
@@ -277,12 +279,12 @@ rebuilt or moved by repeating that guide.
   closes (`DEPLOY-EC2.md`, "After six months").
 
 The Flutter apps' builds for sharing point at this address
-(`--dart-define=STITCHFLOW_API=https://13-237-211-26.sslip.io`). A unit and
+(`--dart-define=STITCHFLOW_API=https://stitchflowapi.bytewrench.tools`). A unit and
 its owner exist on it, and the manager app signs in and works against it.
 
 To use the hosted API from a laptop instead of running one, point the
 clients at it: the Flutter app through Settings → Data, the web panel with
-`API_PROXY_TARGET=https://13-237-211-26.sslip.io npm run dev`.
+`API_PROXY_TARGET=https://stitchflowapi.bytewrench.tools npm run dev`.
 
 **Security:** an earlier README carried the first console admin's temporary
 password in plain text, and that version is pushed (`ea0f916` on

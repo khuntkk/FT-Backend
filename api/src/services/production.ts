@@ -17,22 +17,24 @@ import { getSettings, PERSON_JSON } from './shapes.ts';
 
 /**
  * A slip with its operators and each one's share of the bonus, split equally
- * and rounded to the paisa. Filter on `e`.
+ * and rounded to the paisa. Filter on `e`. Without `pay` the bonus figures are
+ * null: a member who may not see pay never receives them.
  */
-const ENTRY_SELECT = `
+const entrySelect = (pay: boolean) => `
   select e.id, e.machine_id as "machineId", e.work_date as "workDate", e.shift_id as "shiftId",
          e.total_stitches as "totalStitches", e.emb_minutes as "embMinutes", e.stop_minutes as "stopMinutes",
          e.thread_breaks as "threadBreaks", e.frames, e.design_no as "designNo", e.design_name as "designName",
          e.design_stitches as "designStitches", e.has_head_loss as "hasHeadLoss",
-         e.is_stitch_based as "isStitchBased", e.bonus_amount as "bonusAmount",
-         e.bonus_is_manual as "bonusIsManual", e.note, e.slip_photo_file_id as "slipPhotoFileId",
+         e.is_stitch_based as "isStitchBased",
+         ${pay ? 'e.bonus_amount' : 'null::numeric'} as "bonusAmount",
+         ${pay ? 'e.bonus_is_manual' : 'false'} as "bonusIsManual", e.note, e.slip_photo_file_id as "slipPhotoFileId",
          e.created_at as "createdAt", e.updated_at as "updatedAt",
-         k.karigars, k.per_karigar as "bonusPerKarigar"
+         k.karigars, ${pay ? 'k.per_karigar' : 'null::numeric'} as "bonusPerKarigar"
   from production_entries e
   cross join lateral (
     select coalesce(json_agg(json_build_object('staff', ${PERSON_JSON}, 'isHalfDay', ek.is_half_day)
                              order by s.name, s.id), '[]'::json) as karigars,
-           case when count(*) = 0 then 0 else round(e.bonus_amount / count(*), 2) end as per_karigar
+           ${pay ? `case when count(*) = 0 then 0 else round(e.bonus_amount / count(*), 2) end as per_karigar` : 'null::numeric as per_karigar'}
     from entry_karigars ek join staff s on s.id = ek.staff_id
     where ek.entry_id = e.id
   ) k`;
@@ -42,15 +44,15 @@ type EntryRow = ProductionEntry & Omit<EntryWithKarigars, 'entry'>;
 const shape = ({ karigars, bonusPerKarigar, ...entry }: EntryRow): EntryWithKarigars =>
   ({ entry, karigars, bonusPerKarigar });
 
-async function getById(tx: Tx, id: number): Promise<EntryWithKarigars> {
-  const row = await tx.one<EntryRow>(`${ENTRY_SELECT} where e.id = $1 and e.deleted_at is null`, [id]);
+async function getById(tx: Tx, id: number, pay: boolean): Promise<EntryWithKarigars> {
+  const row = await tx.one<EntryRow>(`${entrySelect(pay)} where e.id = $1 and e.deleted_at is null`, [id]);
   if (!row) throw notFound('No such slip.');
   return shape(row);
 }
 
-export async function find(tx: Tx, machineId: number, date: DateOnly, shiftId: number): Promise<EntryWithKarigars> {
+export async function find(tx: Tx, pay: boolean, machineId: number, date: DateOnly, shiftId: number): Promise<EntryWithKarigars> {
   const row = await tx.one<EntryRow>(
-    `${ENTRY_SELECT}
+    `${entrySelect(pay)}
      where e.machine_id = $1 and e.work_date = $2 and e.shift_id = $3 and e.deleted_at is null`,
     [machineId, date, shiftId],
   );
@@ -59,10 +61,10 @@ export async function find(tx: Tx, machineId: number, date: DateOnly, shiftId: n
 }
 
 /** Every live, active machine by number, with its slip for the date and shift or null. */
-export async function day(tx: Tx, date: DateOnly, shiftId: number): Promise<MachineDay[]> {
+export async function day(tx: Tx, pay: boolean, date: DateOnly, shiftId: number): Promise<MachineDay[]> {
   const live = await machines.list(tx, true);
   const rows = await tx.rows<EntryRow>(
-    `${ENTRY_SELECT} where e.work_date = $1 and e.shift_id = $2 and e.deleted_at is null`, [date, shiftId]);
+    `${entrySelect(pay)} where e.work_date = $1 and e.shift_id = $2 and e.deleted_at is null`, [date, shiftId]);
   const byMachine = new Map(rows.map((r) => [r.machineId, shape(r)]));
   return live.map((machine) => ({ machine, entry: byMachine.get(machine.id) ?? null }));
 }
@@ -105,8 +107,7 @@ async function checkDraft(tx: Tx, draft: EntryDraft): Promise<void> {
  * save keeps a hand-typed bonus already on the slip, or gets the rules' figure.
  */
 async function withPermittedBonus(tx: Tx, member: Member, draft: EntryDraft): Promise<EntryDraft> {
-  const r = await tx.one<{ can: boolean }>(`select fn_member_can($1, 'payroll.view') as can`, [member.memberId]);
-  if (r!.can) return draft;
+  if (member.canSeePay) return draft;
   const kept = await tx.one<{ amount: number }>(
     `select bonus_amount as amount from production_entries
      where machine_id = $1 and work_date = $2 and shift_id = $3 and deleted_at is null and bonus_is_manual`,
@@ -170,12 +171,12 @@ export async function save(tx: Tx, member: Member, given: EntryDraft): Promise<E
     [member.propertyId, id, draft.karigars.map((k) => k.staffId), draft.karigars.map((k) => k.isHalfDay)],
   );
   if (draft.scanId != null) await tx.exec(`update slip_scans set entry_id = $1 where id = $2`, [id, draft.scanId]);
-  return getById(tx, id);
+  return getById(tx, id, member.canSeePay);
 }
 
 /** Soft delete. Returns the slip as it was. */
 export async function remove(tx: Tx, member: Member, id: number): Promise<EntryWithKarigars> {
-  const before = await getById(tx, id);
+  const before = await getById(tx, id, true);
   await tx.exec(
     `update production_entries set deleted_at = now(), deleted_by_member_id = $2, deleted_batch = gen_random_uuid()
      where id = $1 and deleted_at is null`,
@@ -205,12 +206,12 @@ function decodeCursor(cursor: string): [DateOnly, number] {
 }
 
 /** Slips from `from` to `to` inclusive, newest first, a page at a time. */
-export async function page(tx: Tx, q: EntryQuery): Promise<EntryPage> {
+export async function page(tx: Tx, pay: boolean, q: EntryQuery): Promise<EntryPage> {
   const limit = q.limit ?? 100;
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw invalid({ limit: 'range' }, 'limit is 1 to 500.');
   const [afterDate, afterId] = q.cursor ? decodeCursor(q.cursor) : [null, null];
   const rows = await tx.rows<EntryRow>(
-    `${ENTRY_SELECT}
+    `${entrySelect(pay)}
      where e.deleted_at is null and e.work_date between $1 and $2
        and ($3::bigint is null or e.shift_id = $3)
        and ($4::bigint is null or exists (select 1 from entry_karigars x where x.entry_id = e.id and x.staff_id = $4))

@@ -6,7 +6,7 @@ export const attendanceHandlers: MemberHandlers<
   | 'PUT /v1/attendance/mark' | 'PUT /v1/attendance/marks' | 'POST /v1/attendance/mark-all'
   | 'DELETE /v1/attendance/mark' | 'POST /v1/attendance/undo-mark-all' | 'POST /v1/attendance/clear-month'
 > = {
-  'GET /v1/attendance/day': (c) => attendance.day(c.tx, c.query.date, c.query.category),
+  'GET /v1/attendance/day': (c) => attendance.day(c.tx, c.member, c.query.date, c.query.category),
   'GET /v1/attendance/daily': (c) => attendance.daily(c.tx, c.query.month),
   'GET /v1/staff/:id/attendance': (c) =>
     attendance.forStaff(c.tx, c.member, c.params.id, c.query.from, c.query.to),

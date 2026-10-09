@@ -17,7 +17,7 @@ import { PERSON_JSON } from './shapes.ts';
 const MAX_RANGE_DAYS = 366;
 
 /** Every active person with their resolved day; unmarked is status null. */
-export function day(tx: Tx, date: string, category?: StaffCategory): Promise<StaffHajari[]> {
+export function day(tx: Tx, member: Member, date: string, category?: StaffCategory): Promise<StaffHajari[]> {
   return tx.rows<StaffHajari>(
     `select ${PERSON_JSON} as staff,
             json_build_object('date', $1::date, 'status', d.status,
@@ -25,8 +25,9 @@ export function day(tx: Tx, date: string, category?: StaffCategory): Promise<Sta
      from staff s
      left join vw_attendance_days d on d.staff_id = s.id and d.work_date = $1::date
      where s.deleted_at is null and s.is_active and ($2::text is null or s.category = $2)
+       and (not $3::boolean or s.id = $4::bigint)
      order by s.name, s.id`,
-    [date, category ?? null],
+    [date, category ?? null, member.role === 'worker', member.staffId],
   );
 }
 

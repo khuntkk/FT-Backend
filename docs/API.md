@@ -61,6 +61,7 @@ action is super admin only whatever the module level.
 | 409 | `grant_exceeds_granter` | Giving a sub user more than the granter has, or more than the role's ceiling. |
 | 413 | `file_too_large` | Over 15 MB. |
 | 429 | `rate_limited` | Sign-in attempts, mostly. |
+| 503 | `internal` | The database timed out (statement or lock timeout); `details.retryAfter` seconds. Safe to retry. |
 
 ---
 
@@ -70,12 +71,15 @@ Access tokens are JWTs, 15 minutes, claims `sub` (user id), `mid` (member id),
 `pid` (property id), `role`, `client`. Refresh tokens are opaque, 256-bit,
 stored hashed in `auth_sessions`, valid 7 days — 15 with `keepSignedIn` —
 and **rotated on every use**; presenting an already-rotated token revokes its
-whole family. The apps keep the refresh token in the platform keystore
+whole family — unless it was rotated less than 60 seconds ago and the pair it
+was rotated to is still live: that is a retried refresh (the reply was lost),
+so the live child is rotated and a fresh pair issued, and the first child's
+token stops working. The apps keep the refresh token in the platform keystore
 (`flutter_secure_storage`), never in shared preferences.
 
 | Method | Path | Body → Response |
 | --- | --- | --- |
-| POST | `/auth/login` | `{ identifier, password, client: "managerApp"\|"crewApp", keepSignedIn }` — identifier is a phone (E.164), email or username. → `{ accessToken, refreshToken, expiresIn, user, memberships: [Membership], activeMember: Membership\|null }`. With exactly one active membership it is chosen; otherwise the app shows a picker and calls `select-property`. Wrong identifier and wrong password give the same `401` (`unauthenticated`), but `details.reason` carries `noSuchUser` / `wrongPassword` for the apps' existing messages. Rate-limited per identifier and per IP. |
+| POST | `/auth/login` | `{ identifier, password, client: "managerApp"\|"crewApp", keepSignedIn }` — identifier is a phone (E.164), email or username. → `{ accessToken, refreshToken, expiresIn, user, memberships: [Membership], activeMember: Membership\|null }`. With exactly one active membership it is chosen; otherwise the app shows a picker and calls `select-property`. Wrong identifier and wrong password give the identical `401` (`unauthenticated`, `details.reason: wrongPassword`, message "Phone, email or password is not right."); `noSuchUser` is no longer sent. Failures are limited per identifier + IP (10 per 15 min, then `429`), per IP (200 per 15 min, IPv6 counted per /64), and an identifier failing from anywhere slows down progressively (never refused). Identifier over 254 or password over 256 characters is the same `401`. |
 | POST | `/auth/select-property` | `{ memberId }` → new token pair bound to that membership. Also the property switcher. |
 | POST | `/auth/refresh` | `{ refreshToken }` → new pair. |
 | POST | `/auth/logout` | `{ refreshToken }` → 204. Revokes that session. `?everywhere=true` revokes all the user's sessions. |
@@ -220,7 +224,7 @@ Purging items past seven days is a **scheduled job** (daily), not an endpoint an
 | GET | `/files/:id` | view on the owning module | `302` to a short-lived signed URL. |
 
 ### Live updates
-`GET /v1/events` — Server-Sent Events: `{ "table": "production_entries", "ids": [...] }` after each write in the property, so the apps refresh the stream that shows it instead of polling. Sent as `event: change`, with a `: ping` comment every 25 s. The apps also refetch after their own writes and on resume.
+`GET /v1/events` — Server-Sent Events: `{ "table": "production_entries", "ids": [...] }` after each write in the property, sent only to members who may view that table (decided when the stream opens; a stream ends with `event: bye` when its member is disabled, removed or has their access changed), so the apps refresh the stream that shows it instead of polling. Sent as `event: change`, with a `: ping` comment every 25 s. The apps also refetch after their own writes and on resume.
 
 ---
 
@@ -233,7 +237,7 @@ reset passwords; everything else needs `admin`.
 
 | Method | Path | Who | |
 | --- | --- | --- | --- |
-| POST | `/platform/auth/login` | staff | `{ email, password, totpCode? }`. Once a staff member has two-factor sign-in on, `totpCode` is required: without it `401 unauthenticated` with `details.reason: totpRequired`, a wrong or reused one `wrongTotp`. |
+| POST | `/platform/auth/login` | staff | `{ email, password, totpCode? }`. Once a staff member has two-factor sign-in on, `totpCode` is required: without it `401 unauthenticated` with `details.reason: totpRequired`, a wrong or reused one `wrongTotp` (5 wrong codes per user per 15 min, then `429`). With `REQUIRE_PLATFORM_TOTP` (default on in production) staff who have not enabled it may call only `GET /platform/me` and the TOTP setup/enable routes; everything else is `403 forbidden` with `details.reason: totpSetupRequired`. |
 | GET | `/platform/me` | staff | The signed-in console user: `{ userId, displayName, email, role, totpEnabled }`. |
 | POST | `/platform/auth/totp/setup` | staff (self) | → `{ secret, otpauthUrl }` for an authenticator app (TOTP: SHA-1, 30 s, 6 digits). Not on until enabled. |
 | POST | `/platform/auth/totp/enable` | staff (self) | `{ code }` from the app → 204. Sign-in needs a code from now on. |

@@ -92,3 +92,38 @@ describe('two-factor sign-in for console staff', () => {
     assert.equal(res.status, 403);
   });
 });
+
+describe('required two-factor (REQUIRE_PLATFORM_TOTP)', () => {
+  it('lets staff without it reach only setup, and a wrong-code counter stops guessing', async () => {
+    const strict = await startHarness({ requirePlatformTotp: true });
+    try {
+      const [{ id }] = await strict.sql(
+        `insert into users (display_name, email, password_hash, must_change_password)
+         values ('Req', 'req@stitchflow.test', $1, false) returning id`, [await hashPassword(PASSWORD)]);
+      await strict.sql(`insert into platform_staff (user_id, role) values ($1, 'admin')`, [id]);
+      const res = await new Client(strict.app).post('/v1/platform/auth/login', { email: 'req@stitchflow.test', password: PASSWORD });
+      assert.equal(res.status, 200);
+      const c = new Client(strict.app, res.body.accessToken);
+      assert.equal((await c.get('/v1/platform/me')).status, 200);
+      const blocked = await c.get('/v1/platform/staff');
+      assert.equal(blocked.status, 403);
+      assert.equal(blocked.body.error.code, 'forbidden');
+      assert.equal(blocked.body.error.details.reason, 'totpSetupRequired');
+      const setup = await c.post('/v1/platform/auth/totp/setup');
+      assert.equal(setup.status, 200);
+      assert.equal((await c.post('/v1/platform/auth/totp/enable', { code: codeFor(setup.body.secret, -1) })).status, 204);
+      assert.equal((await c.get('/v1/platform/staff')).status, 200);
+      // Five wrong codes, then even the right password gets a 429.
+      for (let i = 0; i < 5; i++) {
+        const w = await new Client(strict.app).post('/v1/platform/auth/login',
+          { email: 'req@stitchflow.test', password: PASSWORD, totpCode: '000000' });
+        assert.equal(w.body.error.details.reason, 'wrongTotp');
+      }
+      const locked = await new Client(strict.app).post('/v1/platform/auth/login',
+        { email: 'req@stitchflow.test', password: PASSWORD, totpCode: codeFor(setup.body.secret) });
+      assert.equal(locked.status, 429);
+    } finally {
+      await strict.close();
+    }
+  });
+});

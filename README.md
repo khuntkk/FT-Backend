@@ -137,7 +137,7 @@ login that owns the `public` schema and has `CREATEROLE` (migration 0004
 creates the roles `stitchflow_api` and `stitchflow_platform`), then create
 `api_login` and `console_login` as in step 5. Leave `SUPABASE_URL` unset and
 photos go to local disk (`FILES_DIR`). Connections to `localhost` are plain;
-anything else uses TLS (`DATABASE_SSL`: `off`, `require`, `verify`).
+anything else uses TLS, verified by default (`DATABASE_SSL`: `verify` needs `DATABASE_CA_FILE`; `require` and `off` are explicit opt-ins).
 
 ## Tests
 
@@ -190,7 +190,7 @@ Rules that are easy to break:
   `db/migrations/0003_access_catalog.sql` says which), and audited.
 - The machine limit is enforced by the database (`0005`); the API maps its
   error to `409 machine_limit_reached`.
-- Parameterized SQL only.
+- Parameterized SQL only. (One exception: the transaction-opening statement in `db/db.ts` is parameterless so it can share a round trip with `begin`; its two values are escaped with `pg.escapeLiteral` and are a fixed role and a validated integer.)
 
 ## Production
 

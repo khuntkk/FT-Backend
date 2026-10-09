@@ -28,20 +28,21 @@ marked as (
   where deleted_at is null
 ),
 resolved as (
-  select
-    coalesce(k.property_id, w.property_id) as property_id,
-    coalesce(k.staff_id, w.staff_id)       as staff_id,
-    coalesce(k.work_date, w.work_date)     as work_date,
-    coalesce(
-      k.status,
-      case when w.every_entry_half then 'halfDay' else 'present' end
-    )                                      as status,
-    (k.status is null)                     as from_production
+  -- a live hand mark wins, whatever production says
+  select k.property_id, k.staff_id, k.work_date, k.status, false as from_production
   from marked k
-  full join worked w
-    on w.property_id = k.property_id
-   and w.staff_id = k.staff_id
-   and w.work_date = k.work_date
+  union all
+  -- otherwise the production-derived day, for a day with no hand mark
+  select w.property_id, w.staff_id, w.work_date,
+         case when w.every_entry_half then 'halfDay' else 'present' end,
+         true
+  from worked w
+  where not exists (
+    select 1 from marked k
+    where k.property_id = w.property_id
+      and k.staff_id = w.staff_id
+      and k.work_date = w.work_date
+  )
 )
 select
   property_id,

@@ -1,8 +1,35 @@
 # HTTPS for the API. Caddy gets a Let's Encrypt certificate for API_DOMAIN on
 # first start (ports 80 and 443 must be open and the domain must point here),
-# redirects http to https, and passes everything to the API. Live updates
-# (/v1/events, text/event-stream) are flushed as they are written.
+# redirects http to https, and passes everything to the API.
+#
+# JSON responses are compressed (zstd, gzip); /v1/events (text/event-stream)
+# is not, so each live update is flushed as it is written. Responses carry
+# HSTS, nosniff and no-referrer headers and no Server header. Uploads are
+# capped at 20MB (the API's own photo limit is 15MB), and a client has 15s to
+# send its request headers.
+
+{
+	servers {
+		timeouts {
+			read_header 15s
+		}
+	}
+}
 
 {$API_DOMAIN} {
+	@compressible not path /v1/events
+	encode @compressible zstd gzip
+
+	request_body {
+		max_size 20MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+
 	reverse_proxy api:3000
 }

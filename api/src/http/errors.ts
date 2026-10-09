@@ -15,8 +15,10 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
   }
+  /** Set for the one answer the contract has no code for (503 internal). */
+  statusOverride?: number;
   get status(): number {
-    return ERROR_STATUS[this.code];
+    return this.statusOverride ?? ERROR_STATUS[this.code];
   }
 }
 
@@ -87,6 +89,13 @@ export function fromDatabase(e: unknown): ApiError | null {
       return new ApiError('shift_cycle_clash', 'Two versions of one shift on a day.', { problems: [] });
   }
   switch (e.code) {
+    case '57014': // query_canceled: statement_timeout
+    case '55P03': { // lock_not_available: lock_timeout
+      // The contract has no 503 code; 'internal' is what the app already treats as a server fault.
+      const err = new ApiError('internal' as ErrorCode, 'The database is busy; try again.', { retryAfter: 2 });
+      err.statusOverride = 503;
+      return err;
+    }
     case '23505': // unique_violation
     case '23514': // check_violation
     case '23502': // not_null_violation

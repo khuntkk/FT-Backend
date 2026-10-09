@@ -80,6 +80,12 @@ describe('attendance', () => {
     assert.deepEqual(others.body.map((r: any) => r.staff.name), ['Chetan']);
   });
 
+  it('shows a worker only their own row', async () => {
+    const res = await as.worker.get('/v1/attendance/day', { date: '2026-09-10' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.map((r: any) => r.staff.name), ['Asha']);
+  });
+
   it('never counts a stitch-based slip; half only when every slip is half', async () => {
     assert.equal((await days(as.admin, bharat, '2026-09-11', '2026-09-11'))[0].status, null);
     const res = await days(as.admin, asha, '2026-09-10', '2026-09-13');

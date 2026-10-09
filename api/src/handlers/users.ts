@@ -21,6 +21,7 @@ export const usersHandlers: MemberHandlers<
     const [before, after] = await users.updateAccess(c.tx, c.member, c.params.memberId, c.body.modules);
     c.audit({ entityType: 'member', entityId: after.id, before, after, force: true });
     c.changed('property_members', [after.id]);
+    c.tx.afterCommit(() => c.services.events.drop(c.params.memberId));
     return after;
   },
   'POST /v1/users/:memberId/reset-password': async (c) => {
@@ -32,6 +33,7 @@ export const usersHandlers: MemberHandlers<
     const [before, after] = await users.setStatus(c.tx, c.member, c.params.memberId, 'disabled');
     c.audit({ entityType: 'member', entityId: after.id, before, after, force: true });
     c.changed('property_members', [after.id]);
+    c.tx.afterCommit(() => c.services.events.drop(c.params.memberId));
     return after;
   },
   'POST /v1/users/:memberId/enable': async (c) => {
@@ -44,17 +46,20 @@ export const usersHandlers: MemberHandlers<
     const before = await users.remove(c.tx, c.member, c.params.memberId);
     c.audit({ entityType: 'member', entityId: before.id, before });
     c.changed('property_members', [before.id]);
+    c.tx.afterCommit(() => c.services.events.drop(before.id));
   },
   'POST /v1/users/:memberId/super-admin': async (c) => {
     const [before, after] = await users.setSuperAdmin(c.tx, c.params.memberId, true);
     c.audit({ entityType: 'member', entityId: after.id, before, after });
     c.changed('property_members', [after.id]);
+    c.tx.afterCommit(() => c.services.events.drop(c.params.memberId));
     return after;
   },
   'DELETE /v1/users/:memberId/super-admin': async (c) => {
     const [before, after] = await users.setSuperAdmin(c.tx, c.params.memberId, false);
     c.audit({ entityType: 'member', entityId: after.id, before, after });
     c.changed('property_members', [after.id]);
+    c.tx.afterCommit(() => c.services.events.drop(c.params.memberId));
     return after;
   },
   'POST /v1/users/transfer-ownership': async (c) => {
@@ -64,5 +69,6 @@ export const usersHandlers: MemberHandlers<
       before: { ownerMemberId: c.member.memberId }, after: { ownerMemberId: to.id },
     });
     c.changed('property_members', [c.member.memberId, to.id]);
+    c.tx.afterCommit(() => { c.services.events.drop(c.member.memberId); c.services.events.drop(to.id); });
   },
 };

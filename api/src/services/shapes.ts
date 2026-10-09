@@ -2,7 +2,7 @@
 // Member looks the same from every endpoint. Each is a fragment for
 // `select <fragment> from <table> <alias>`.
 
-import type { Member, Property, PropertySettings, User } from '@stitchflow/contract';
+import type { Me, Member, Property, PropertySettings, User } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 
 /** From users u. */
@@ -57,6 +57,35 @@ export async function getSettings(tx: Tx, propertyId: number): Promise<PropertyS
      where s.property_id = $1`,
     [propertyId],
   );
+}
+
+// Inside row_to_json the type parsers do not apply: ids and money are already JSON
+// numbers, but an instant is text like 2026-01-01T10:00:00.5+00:00. Normalise to
+// the "…Z" form PARSERS gives everywhere else.
+const iso = (v: unknown) => (typeof v === 'string' ? new Date(v).toISOString() : v);
+
+/** Pay-rate settings are null unless $2 (the member) may see settings or pay. */
+const SEES_RATES = `(fn_member_can($2, 'settings.view') or fn_member_can($2, 'payroll.view'))`;
+const MASKED_SETTINGS_COLUMNS = SETTINGS_COLUMNS
+  .replace('s.no_leave_bonus_amount as', `case when ${SEES_RATES} then s.no_leave_bonus_amount end as`)
+  .replace('s.stitch_based_rate_per_thousand as', `case when ${SEES_RATES} then s.stitch_based_rate_per_thousand end as`);
+
+/** GET /v1/me in one statement: user, member, property and settings. */
+export async function getMe(tx: Tx, userId: number, memberId: number, propertyId: number): Promise<Me> {
+  const r = (await tx.one<{ user: any; member: any; property: any; settings: any }>(
+    `select
+       (select row_to_json(t) from (select ${USER_COLUMNS} from users u where u.id = $1) t) as "user",
+       (select row_to_json(t) from (select ${MEMBER_COLUMNS} from property_members m
+          join users u on u.id = m.user_id where m.id = $2) t) as member,
+       (select row_to_json(t) from (select ${PROPERTY_COLUMNS} from properties p where p.id = $3) t) as property,
+       (select row_to_json(t) from (select ${MASKED_SETTINGS_COLUMNS} from property_settings s
+          join properties p on p.id = s.property_id where s.property_id = $3) t) as settings`,
+    [userId, memberId, propertyId],
+  ))!;
+  r.user.lastLoginAt = iso(r.user.lastLoginAt);
+  r.member.createdAt = iso(r.member.createdAt);
+  r.property.createdAt = iso(r.property.createdAt);
+  return { user: r.user, member: r.member, property: r.property, settings: r.settings, modules: r.member.modules };
 }
 
 /** From staff s: a person with pay. Supervisors never receive this shape. */

@@ -16,7 +16,9 @@ import {
 } from '../auth/tokens.ts';
 import * as platformTotp from './platformTotp.ts';
 import { getUser } from './shapes.ts';
-import { signInByIdentifier, signInByIp } from './rateLimit.ts';
+import {
+  assertSignInInputSize, identifierColumn, recordSignInFailure, recordSignInSuccess, signInKeys, totpByUser,
+} from './rateLimit.ts';
 
 const SESSION_DAYS = 7;
 const KEEP_SIGNED_IN_DAYS = 15;
@@ -48,13 +50,6 @@ const usable = (r: MembershipRow) => r.status === 'active' && r.property_status 
 // row-level security until a property is chosen.
 const memberships = (tx: Tx, userId: number) =>
   tx.rows<MembershipRow>(`select * from fn_user_memberships($1)`, [userId]);
-
-/** Which column an identifier names: a phone starts with +, an email has an @. */
-function identifierColumn(identifier: string): 'phone' | 'email' | 'username' {
-  if (identifier.startsWith('+')) return 'phone';
-  if (identifier.includes('@')) return 'email';
-  return 'username';
-}
 
 interface SessionSpec {
   userId: number;
@@ -92,22 +87,23 @@ const memberClaims = (m: MembershipRow | null) => ({
   role: m?.role ?? null,
 });
 
-/** Checks identifier and password, counting failures. Returns the user's id. */
+/**
+ * Checks identifier and password, counting failures. Returns the user's id.
+ * The limits were checked in dispatch; an unknown user and a wrong password
+ * fail the same way, after the same argon2 work.
+ */
 async function authenticate(tx: Tx, column: string, identifier: string, password: string, ip: string) {
-  const idKey = `${column}:${identifier.toLowerCase()}`;
-  signInByIdentifier.assertAllowed(idKey);
-  signInByIp.assertAllowed(ip);
+  assertSignInInputSize(identifier, password);
+  const keys = signInKeys(column, identifier, ip);
   const u = await tx.one<{ id: number; password_hash: string | null; status: string }>(
     `select id, password_hash, status from users where ${column} = $1`,
     [identifier],
   );
-  const fail = (reason: string, message: string) => {
-    signInByIdentifier.recordFailure(idKey);
-    signInByIp.recordFailure(ip);
-    return new ApiError('unauthenticated', message, { reason });
-  };
-  if (!u) throw fail('noSuchUser', 'No account with that sign-in.');
-  if (!(await checkPassword(u.password_hash, password))) throw fail('wrongPassword', 'Wrong password.');
+  if (!(await checkPassword(u?.password_hash ?? null, password)) || !u) {
+    recordSignInFailure(keys);
+    throw new ApiError('unauthenticated', 'Phone, email or password is not right.', { reason: 'wrongPassword' });
+  }
+  recordSignInSuccess(keys);
   if (u.status !== 'active') throw new ApiError('unauthenticated', 'This account is switched off.', { reason: 'disabled' });
   await tx.exec(`update users set last_login_at = now() where id = $1`, [u.id]);
   return u.id;
@@ -145,11 +141,11 @@ export async function platformLogin(
   const userId = await authenticate(tx, 'email', email, input.password, ip);
   const staff = await tx.one<{ role: PlatformRole }>(`select role from platform_staff where user_id = $1`, [userId]);
   if (!staff) throw new ApiError('forbidden', 'Not console staff.');
+  // Wrong codes have their own, stricter counter: 5 per 15 minutes per user.
+  totpByUser.assertAllowed(String(userId));
   const totp = await platformTotp.checkAtSignIn(tx, userId, input.totpCode);
-  if (totp === 'wrongTotp') {
-    signInByIdentifier.recordFailure(`email:${email.toLowerCase()}`);
-    signInByIp.recordFailure(ip);
-  }
+  if (totp === 'wrongTotp') totpByUser.recordFailure(String(userId));
+  else if (!totp) totpByUser.reset(String(userId));
   if (totp) {
     throw new ApiError('unauthenticated', totp === 'totpRequired'
       ? 'Enter the code from your authenticator app.' : 'That code does not match.', { reason: totp });
@@ -176,30 +172,54 @@ export async function selectProperty(tx: Tx, secret: string, claims: AccessClaim
   }, memberClaims(m));
 }
 
+interface SessionRow {
+  id: string; user_id: number; member_id: number | null; client: ClientKind; family_id: string;
+  keep_signed_in: boolean; device_label: string | null; revoked_at: string | null;
+  revoked_reason: string | null; expired: boolean; user_status: string; recent: boolean;
+}
+
+/** One session row, locked, with whether it was revoked in the last minute. */
+const findSession = (tx: Tx, where: string, ...params: unknown[]) =>
+  tx.one<SessionRow>(
+    `select s.*, s.expires_at <= now() as expired, u.status as user_status,
+            s.revoked_at > now() - interval '60 seconds' as recent
+     from auth_sessions s join users u on u.id = s.user_id
+     where ${where} for update of s`,
+    params,
+  );
+
 /**
  * A new pair for a refresh token — or 'reused' when the token was already
  * rotated away, after revoking its family. That is a 401 to the client, but
  * the revocation must commit, so it is returned rather than thrown.
  */
 export async function refresh(tx: Tx, secret: string, refreshToken: string): Promise<TokenPair | 'reused'> {
-  const s = await tx.one<{
-    id: string; user_id: number; member_id: number | null; client: ClientKind; family_id: string;
-    keep_signed_in: boolean; device_label: string | null; revoked_at: string | null;
-    revoked_reason: string | null; expired: boolean; user_status: string;
-  }>(
-    `select s.*, s.expires_at <= now() as expired, u.status as user_status
-     from auth_sessions s join users u on u.id = s.user_id
-     where s.refresh_token_hash = $1 for update of s`,
-    [hashToken(refreshToken)],
-  );
+  let graceRetry = false;
+  let s = await findSession(tx, `s.refresh_token_hash = $1`, hashToken(refreshToken));
   if (!s) throw new ApiError('unauthenticated', 'Unknown refresh token.');
   if (s.revoked_at) {
     if (s.revoked_reason === 'rotated' || s.revoked_reason === 'switched') {
-      // A token already rotated away was used again: it was copied.
+      // Rotated away moments ago, and the pair it was rotated to is still live:
+      // the reply was probably lost and this is the client's retry. Rotate that
+      // child instead. Anything else was copied: end the family.
+      const child = s.recent
+        ? await findSession(tx, `s.family_id = $1 and s.revoked_at is null and s.created_at >= (select revoked_at from auth_sessions where id = $2)
+                                 order by s.created_at desc limit 1`, s.family_id, s.id)
+        : null;
+      if (!child) {
+        await revokeFamily(tx, s.family_id, 'reused');
+        return 'reused';
+      }
+      s = child;
+      graceRetry = true;
+    } else if (s.revoked_reason === 'rotatedRetry') {
+      // The pair a retried refresh superseded: the client never received it,
+      // so whoever presents it copied it. End the family.
       await revokeFamily(tx, s.family_id, 'reused');
       return 'reused';
+    } else {
+      throw new ApiError('unauthenticated', 'This session has ended.');
     }
-    throw new ApiError('unauthenticated', 'This session has ended.');
   }
   if (s.expired || s.user_status !== 'active') throw new ApiError('unauthenticated', 'This session has ended.');
 
@@ -214,8 +234,8 @@ export async function refresh(tx: Tx, secret: string, refreshToken: string): Pro
     claims = { ...claims, prole: staff.role };
   }
   await tx.exec(
-    `update auth_sessions set revoked_at = now(), revoked_reason = 'rotated', last_used_at = now() where id = $1`,
-    [s.id],
+    `update auth_sessions set revoked_at = now(), revoked_reason = $2, last_used_at = now() where id = $1`,
+    [s.id, graceRetry ? 'rotatedRetry' : 'rotated'],
   );
   return openSession(tx, secret, {
     userId: s.user_id, memberId: s.member_id, client: s.client, keepSignedIn: s.keep_signed_in,
@@ -249,7 +269,7 @@ export const revokeMemberSessions = (tx: Tx, memberId: number, reason: string) =
   tx.exec(`update auth_sessions set revoked_at = now(), revoked_reason = $2
            where member_id = $1 and revoked_at is null`, [memberId, reason]);
 
-export async function changePassword(tx: Tx, userId: number, current: string, next: string): Promise<void> {
+export async function changePassword(tx: Tx, userId: number, sid: string, current: string, next: string): Promise<void> {
   const u = await tx.one<{ password_hash: string | null }>(`select password_hash from users where id = $1`, [userId]);
   if (!(await checkPassword(u?.password_hash ?? null, current))) {
     throw new ApiError('validation_failed', 'The current password is wrong.', {
@@ -262,4 +282,12 @@ export async function changePassword(tx: Tx, userId: number, current: string, ne
   }
   await tx.exec(`update users set password_hash = $2, must_change_password = false where id = $1`,
     [userId, await hashPassword(next)]);
+  // Whoever held the old password may hold a session: end every other device's.
+  // `is distinct from` fails closed: an unknown caller family revokes everything.
+  await tx.exec(
+    `update auth_sessions set revoked_at = now(), revoked_reason = 'passwordChanged'
+     where user_id = $1 and revoked_at is null
+       and family_id is distinct from (select family_id from auth_sessions where id = $2::uuid)`,
+    [userId, sid],
+  );
 }

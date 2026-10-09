@@ -3,6 +3,7 @@
 
 import Fastify, { type FastifyInstance } from 'fastify';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
 import type { Config } from './config.ts';
 import type { Db } from './db/db.ts';
 import { ApiError, errorBody, fromDatabase } from './http/errors.ts';
@@ -19,16 +20,20 @@ export interface AppDeps {
   db: Db;
   storage?: Storage;
   events?: EventBus;
+  /** Per-IP requests a minute on the unauthenticated POST routes (default 30). */
+  unauthLimit?: number;
 }
 
-export async function buildApp({ config, db, storage, events }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db, storage, events, unauthLimit }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: config.logLevel === 'silent' ? false : { level: config.logLevel },
     ajv: ajvOptions,
     trustProxy: config.trustProxy,
     // Request ids go into the log and into audit_log.request_id.
     genReqId: () => crypto.randomUUID(),
-    requestIdHeader: 'x-request-id',
+    // Caddy keeps upstream sockets 2 minutes; Node must close later than that.
+    keepAliveTimeout: 130_000,
+    requestTimeout: 120_000,
   });
   const services: Services = {
     config,
@@ -53,7 +58,33 @@ export async function buildApp({ config, db, storage, events }: AppDeps): Promis
   });
 
   app.addSchema(sharedSchema);
-  await app.register(multipart, { limits: { fileSize: MAX_FILE_BYTES, files: 1 } });
+  // attachFieldsToBody reads the upload in preValidation, before the router
+  // opens the database transaction, so a slow upload holds no connection.
+  await app.register(multipart, { attachFieldsToBody: 'keyValues', limits: { fileSize: MAX_FILE_BYTES, files: 1 } });
+  // global: false: only routes with config.rateLimit are limited (router.ts).
+  await app.register(rateLimit, {
+    global: false,
+    errorResponseBuilder: (_req, ctx) =>
+      new ApiError('rate_limited', 'Too many requests.', { retryAfter: Math.ceil(ctx.ttl / 1000) }),
+  });
+
+  // Ids are minted here, never taken from the client.
+  app.addHook('onRequest', async (req, reply) => {
+    reply.header('x-request-id', req.id);
+  });
+  // Every answer is private; the one that sets its own cache-control keeps it.
+  // While shutting down, tell clients to drop the connection.
+  let closing = false;
+  app.addHook('onSend', async (_req, reply) => {
+    if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
+    if (closing) reply.header('connection', 'close');
+  });
+  // preClose runs before the server stops accepting; onClose would be too late
+  // for the open event streams, which would hold the close until they ended.
+  app.addHook('preClose', async () => {
+    closing = true;
+    services.events.endStreams();
+  });
 
   app.setErrorHandler((err: any, req, reply) => {
     const known = err instanceof ApiError ? err : fromDatabase(err);
@@ -92,11 +123,12 @@ export async function buildApp({ config, db, storage, events }: AppDeps): Promis
     app.addHook('onRequest', async (req, reply) => {
       const origin = req.headers.origin;
       if (!origin || !allowed.has(origin)) return;
-      reply.header('access-control-allow-origin', origin).header('vary', 'Origin');
+      reply.header('access-control-allow-origin', origin).header('vary', 'Origin')
+        .header('access-control-expose-headers', 'x-request-id');
       if (req.method === 'OPTIONS') {
         return reply
           .header('access-control-allow-methods', 'GET, POST, PUT, PATCH, DELETE')
-          .header('access-control-allow-headers', 'authorization, content-type, idempotency-key, x-request-id')
+          .header('access-control-allow-headers', 'authorization, content-type, idempotency-key')
           .header('access-control-max-age', '600')
           .code(204)
           .send();
@@ -120,6 +152,6 @@ export async function buildApp({ config, db, storage, events }: AppDeps): Promis
     });
   }
 
-  registerRoutes(app, db, services, handlers);
+  registerRoutes(app, db, services, handlers, unauthLimit);
   return app;
 }

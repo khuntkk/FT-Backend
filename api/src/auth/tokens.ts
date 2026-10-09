@@ -32,6 +32,16 @@ export function signAccessToken(claims: AccessClaims, secret: string, now = Date
   return `${HEADER}.${payload}.${sig}`;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CLIENTS = ['managerApp', 'crewApp', 'webAdmin'];
+const intOrNull = (v: unknown) => v === null || Number.isSafeInteger(v);
+
+function validShape(c: any): boolean {
+  return typeof c === 'object' && c !== null && Number.isSafeInteger(c.sub) &&
+    typeof c.sid === 'string' && UUID.test(c.sid) && CLIENTS.includes(c.client) &&
+    intOrNull(c.mid) && intOrNull(c.pid);
+}
+
 /** The claims of a valid token; 401 unauthenticated or token_expired otherwise. */
 export function verifyAccessToken(token: string, secret: string, now = Date.now()): AccessClaims {
   const [header, payload, sig] = token.split('.');
@@ -49,6 +59,7 @@ export function verifyAccessToken(token: string, secret: string, now = Date.now(
   } catch {
     throw new ApiError('unauthenticated', 'Malformed token.');
   }
+  if (!validShape(claims)) throw new ApiError('unauthenticated', 'Malformed token.');
   if (typeof claims.exp !== 'number' || claims.exp * 1000 <= now) {
     throw new ApiError('token_expired', 'Access token expired.');
   }

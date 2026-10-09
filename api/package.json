@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.2",
+    "@fastify/rate-limit": "^11.2.1",
     "@node-rs/argon2": "^2.2.1",
     "@stitchflow/contract": "^1.1.0",
     "fastify": "^5.12.5",

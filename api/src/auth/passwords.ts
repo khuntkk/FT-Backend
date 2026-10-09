@@ -1,7 +1,7 @@
 // Passwords: argon2id, and the temporary passwords the owner and our support
 // hand out, shown once.
 
-import { randomInt } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { hash, verify } from '@node-rs/argon2';
 
 /** The password the apps' seeded demo accounts share (apps README). Never a real one. */
@@ -12,9 +12,17 @@ export const MIN_PASSWORD_LENGTH = 8;
 // OWASP's recommended minimum.
 export const hashPassword = (password: string): Promise<string> => hash(password, { algorithm: 2 });
 
+// Verified against when there is no stored hash, so an unknown user costs the
+// same time as a wrong password. Computed once, on first use.
+let dummyHash: Promise<string> | null = null;
+const dummy = () => (dummyHash ??= hashPassword(randomBytes(24).toString('base64url')));
+
 export async function checkPassword(stored: string | null, password: string): Promise<boolean> {
-  if (!stored) return false;
   try {
+    if (!stored) {
+      await verify(await dummy(), password);
+      return false;
+    }
     return await verify(stored, password);
   } catch {
     return false;
