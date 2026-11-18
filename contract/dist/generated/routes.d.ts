@@ -699,6 +699,13 @@ export interface ApiRoutes {
         body: undefined;
         response: T.PlatformStaffMember;
     };
+    /** Change one's own name. */
+    "PATCH /v1/platform/me": {
+        params: {};
+        query: {};
+        body: T.PlatformMePatch;
+        response: T.PlatformStaffMember;
+    };
     /** Start two-factor sign-in: a new secret for an authenticator app. Not on until enabled with a code. */
     "POST /v1/platform/auth/totp/setup": {
         params: {};
@@ -746,7 +753,7 @@ export interface ApiRoutes {
         body: undefined;
         response: T.PropertyDetail;
     };
-    /** Rename, change zone, set the machine limit, suspend or reactivate. */
+    /** Change code, name, zone or machine limit; suspend or reactivate. */
     "PATCH /v1/platform/properties/:id": {
         params: {
             id: number;
@@ -781,6 +788,15 @@ export interface ApiRoutes {
         query: {};
         body: undefined;
         response: T.PlatformUser;
+    };
+    /** Change a user's name, phone, email or username. */
+    "PATCH /v1/platform/users/:id": {
+        params: {
+            id: number;
+        };
+        query: {};
+        body: T.UserPatch;
+        response: T.User;
     };
     /** Set a temporary password. */
     "POST /v1/platform/users/:id/reset-password": {
@@ -846,6 +862,15 @@ export interface ApiRoutes {
         query: {};
         body: T.PlatformStaffInput;
         response: T.CreatedPlatformStaff;
+    };
+    /** Change a console user's name, email or role. */
+    "PATCH /v1/platform/staff/:id": {
+        params: {
+            id: number;
+        };
+        query: {};
+        body: T.PlatformStaffPatch;
+        response: T.PlatformStaffMember;
     };
     /** Remove a console user. */
     "DELETE /v1/platform/staff/:id": {

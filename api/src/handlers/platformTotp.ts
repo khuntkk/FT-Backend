@@ -1,12 +1,12 @@
 import type { PlatformHandlers } from '../http/types.ts';
 import { notFound } from '../http/errors.ts';
-import { getStaff } from '../services/platform.ts';
+import { getStaff, updateMe } from '../services/platform.ts';
 import * as totp from '../services/platformTotp.ts';
 
 // The router audits each of these (console changes); the secret never goes
 // into the audit row, because nothing here passes it to c.audit.
 export const platformTotpHandlers: PlatformHandlers<
-  | 'GET /v1/platform/me'
+  | 'GET /v1/platform/me' | 'PATCH /v1/platform/me'
   | 'POST /v1/platform/auth/totp/setup' | 'POST /v1/platform/auth/totp/enable'
   | 'POST /v1/platform/auth/totp/disable' | 'DELETE /v1/platform/staff/:id/totp'
 > = {
@@ -14,6 +14,11 @@ export const platformTotpHandlers: PlatformHandlers<
     const me = await getStaff(c.tx, c.staff.userId);
     if (!me) throw notFound('Not console staff.');
     return me;
+  },
+  'PATCH /v1/platform/me': async (c) => {
+    const { before, after } = await updateMe(c.tx, c.staff.userId, c.body);
+    c.audit({ entityType: 'platformStaff', entityId: after.userId, before, after });
+    return after;
   },
   'POST /v1/platform/auth/totp/setup': async (c) => {
     c.audit({ entityType: 'platformStaff', entityId: c.staff.userId });

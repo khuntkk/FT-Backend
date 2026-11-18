@@ -908,6 +908,8 @@ export interface CreatedProperty {
 }
 
 export interface PropertyPatch {
+  /** Lower case, digits and hyphens, 2 to 40; unique. Everything refers to the id, so a new code moves nothing. */
+  code?: string;
   name?: string;
   timezone?: string;
   status?: PropertyStatus;
@@ -961,4 +963,28 @@ export interface CreatedPlatformStaff {
   staff: PlatformStaffMember;
   /** Shown once. */
   temporaryPassword: string;
+}
+
+/** Who someone is and what they sign in with. At least one of username, phone and email stays. */
+export interface UserPatch {
+  displayName?: string;
+  /** 3 to 40 of a-z, 0-9, dot, underscore and hyphen. Null removes it. */
+  username?: string | null;
+  /** E.164, e.g. "+919812345678". Null removes it. */
+  phone?: string | null;
+  /** Null removes it. */
+  email?: string | null;
+}
+
+export interface PlatformStaffPatch {
+  displayName?: string;
+  /** What they sign in to the console with. */
+  email?: string;
+  /** Not one's own. */
+  role?: PlatformRole;
+}
+
+/** One's own name. An admin changes an email. */
+export interface PlatformMePatch {
+  displayName: string;
 }

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "StitchFlow API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "The contract between the StitchFlow apps, the web admin panel and the API. Every operation names the permission action it needs (x-action); a destructive action is super admin only. Dates without a time are \"YYYY-MM-DD\"; instants are ISO-8601 UTC; money is rounded to the paisa. See HANDOVER.md."
   },
   "servers": [
@@ -3229,6 +3229,10 @@
       "PropertyPatch": {
         "type": "object",
         "properties": {
+          "code": {
+            "type": "string",
+            "description": "Lower case, digits and hyphens, 2 to 40; unique. Everything refers to the id, so a new code moves nothing."
+          },
           "name": {
             "type": "string"
           },
@@ -3407,6 +3411,64 @@
         "required": [
           "staff",
           "temporaryPassword"
+        ]
+      },
+      "UserPatch": {
+        "type": "object",
+        "description": "Who someone is and what they sign in with. At least one of username, phone and email stays.",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "3 to 40 of a-z, 0-9, dot, underscore and hyphen. Null removes it."
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "E.164, e.g. \"+919812345678\". Null removes it."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Null removes it."
+          }
+        }
+      },
+      "PlatformStaffPatch": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "description": "What they sign in to the console with."
+          },
+          "role": {
+            "$ref": "#/components/schemas/PlatformRole",
+            "description": "Not one's own."
+          }
+        }
+      },
+      "PlatformMePatch": {
+        "type": "object",
+        "description": "One's own name. An admin changes an email.",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "displayName"
         ]
       }
     }
@@ -7498,6 +7560,51 @@
           }
         ],
         "x-platform-role": "support"
+      },
+      "patch": {
+        "operationId": "patchPlatformMe",
+        "summary": "Change one's own name.",
+        "tags": [
+          "platform/me"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformMePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformStaffMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-platform-role": "support"
       }
     },
     "/v1/platform/auth/totp/setup": {
@@ -7769,7 +7876,7 @@
       },
       "patch": {
         "operationId": "patchPlatformPropertiesById",
-        "summary": "Rename, change zone, set the machine limit, suspend or reactivate.",
+        "summary": "Change code, name, zone or machine limit; suspend or reactivate.",
         "tags": [
           "platform/properties"
         ],
@@ -7971,6 +8078,62 @@
           }
         ],
         "x-platform-role": "support"
+      },
+      "patch": {
+        "operationId": "patchPlatformUsersById",
+        "summary": "Change a user's name, phone, email or username.",
+        "tags": [
+          "platform/users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-platform-role": "admin"
       }
     },
     "/v1/platform/users/{id}/reset-password": {
@@ -8345,6 +8508,62 @@
       }
     },
     "/v1/platform/staff/{id}": {
+      "patch": {
+        "operationId": "patchPlatformStaffById",
+        "summary": "Change a console user's name, email or role.",
+        "tags": [
+          "platform/staff"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformStaffPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformStaffMember"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-platform-role": "admin"
+      },
       "delete": {
         "operationId": "deletePlatformStaffById",
         "summary": "Remove a console user.",

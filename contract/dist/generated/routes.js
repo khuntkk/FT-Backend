@@ -914,6 +914,17 @@ export const ROUTES = [
         "ownerOnly": false
     },
     {
+        "key": "PATCH /v1/platform/me",
+        "method": "PATCH",
+        "path": "/v1/platform/me",
+        "summary": "Change one's own name.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "support",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
         "key": "POST /v1/platform/auth/totp/setup",
         "method": "POST",
         "path": "/v1/platform/auth/totp/setup",
@@ -983,7 +994,7 @@ export const ROUTES = [
         "key": "PATCH /v1/platform/properties/:id",
         "method": "PATCH",
         "path": "/v1/platform/properties/:id",
-        "summary": "Rename, change zone, set the machine limit, suspend or reactivate.",
+        "summary": "Change code, name, zone or machine limit; suspend or reactivate.",
         "action": null,
         "auth": "platform",
         "platformRole": "admin",
@@ -1020,6 +1031,17 @@ export const ROUTES = [
         "action": null,
         "auth": "platform",
         "platformRole": "support",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
+        "key": "PATCH /v1/platform/users/:id",
+        "method": "PATCH",
+        "path": "/v1/platform/users/:id",
+        "summary": "Change a user's name, phone, email or username.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "admin",
         "destructive": false,
         "ownerOnly": false
     },
@@ -1094,6 +1116,17 @@ export const ROUTES = [
         "method": "POST",
         "path": "/v1/platform/staff",
         "summary": "Add a console user.",
+        "action": null,
+        "auth": "platform",
+        "platformRole": "admin",
+        "destructive": false,
+        "ownerOnly": false
+    },
+    {
+        "key": "PATCH /v1/platform/staff/:id",
+        "method": "PATCH",
+        "path": "/v1/platform/staff/:id",
+        "summary": "Change a console user's name, email or role.",
         "action": null,
         "auth": "platform",
         "platformRole": "admin",

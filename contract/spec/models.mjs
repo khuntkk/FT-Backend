@@ -612,6 +612,7 @@ const CreatedProperty = object({
   temporaryPassword: doc(str, 'The owner\'s, shown once.'),
 });
 const PropertyPatch = object({
+  code: opt(doc(str, 'Lower case, digits and hyphens, 2 to 40; unique. Everything refers to the id, so a new code moves nothing.')),
   name: opt(str), timezone: opt(str), status: opt(ref('PropertyStatus')),
   machineLimit: opt(doc(int, 'Lowering it below the machines the unit has removes nothing; it only stops adding.')),
 });
@@ -637,6 +638,18 @@ const PlatformStaffMember = object({
   totpEnabled: doc(bool, 'Two-factor sign-in is on.'),
 });
 const PlatformStaffInput = object({ displayName: str, email: str, role: ref('PlatformRole') });
+const UserPatch = object({
+  displayName: opt(str),
+  username: optNul(doc(str, '3 to 40 of a-z, 0-9, dot, underscore and hyphen. Null removes it.')),
+  phone: optNul(doc(str, 'E.164, e.g. "+919812345678". Null removes it.')),
+  email: optNul(doc(str, 'Null removes it.')),
+}, 'Who someone is and what they sign in with. At least one of username, phone and email stays.');
+const PlatformStaffPatch = object({
+  displayName: opt(str),
+  email: opt(doc(str, 'What they sign in to the console with.')),
+  role: opt(doc(ref('PlatformRole'), 'Not one\'s own.')),
+});
+const PlatformMePatch = object({ displayName: str }, 'One\'s own name. An admin changes an email.');
 const CreatedPlatformStaff = object({
   staff: ref('PlatformStaffMember'),
   temporaryPassword: doc(str, 'Shown once.'),
@@ -660,4 +673,5 @@ export const objects = {
   FileRef, AuditEntry, EntryPage, AuditPage, ApiError, ApiErrorBody,
   PlatformLoginInput, TotpSetup, TotpCodeInput, OwnerInput, CreatePropertyInput, CreatedProperty, PropertyPatch,
   PropertySummary, PropertyDetail, PlatformUser, PlatformStaffMember, PlatformStaffInput, CreatedPlatformStaff,
+  UserPatch, PlatformStaffPatch, PlatformMePatch,
 };

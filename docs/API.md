@@ -239,6 +239,7 @@ reset passwords; everything else needs `admin`.
 | --- | --- | --- | --- |
 | POST | `/platform/auth/login` | staff | `{ email, password, totpCode? }`. Once a staff member has two-factor sign-in on, `totpCode` is required: without it `401 unauthenticated` with `details.reason: totpRequired`, a wrong or reused one `wrongTotp` (5 wrong codes per user per 15 min, then `429`). With `REQUIRE_PLATFORM_TOTP` (default on in production) staff who have not enabled it may call only `GET /platform/me` and the TOTP setup/enable routes; everything else is `403 forbidden` with `details.reason: totpSetupRequired`. |
 | GET | `/platform/me` | staff | The signed-in console user: `{ userId, displayName, email, role, totpEnabled }`. |
+| PATCH | `/platform/me` | staff (self) | `{ displayName }` → the same shape. One's own name only; an admin changes an email. |
 | POST | `/platform/auth/totp/setup` | staff (self) | → `{ secret, otpauthUrl }` for an authenticator app (TOTP: SHA-1, 30 s, 6 digits). Not on until enabled. |
 | POST | `/platform/auth/totp/enable` | staff (self) | `{ code }` from the app → 204. Sign-in needs a code from now on. |
 | POST | `/platform/auth/totp/disable` | staff (self) | `{ code }` → 204. |
@@ -246,15 +247,17 @@ reset passwords; everything else needs `admin`.
 | GET | `/platform/properties?query=&status=` | support | Search by name or code. Each with `machineCount` and `machineLimit`. |
 | POST | `/platform/properties` | admin | `{ code, name, timezone, machineLimit, owner: { displayName, phone, email? } }` → creates the property, its settings, the default shift arrangement, and the owner (a new user, or an existing one by phone) as its main super admin. Returns the owner's temporary password once. |
 | GET | `/platform/properties/:id` | support | Details, members, counts, last activity. |
-| PATCH | `/platform/properties/:id` | admin | `{ name, timezone, status, machineLimit }`: suspend or reactivate, or change the machine limit. Suspending revokes the property's sessions. A limit below the unit's machines removes nothing; it only stops more being added. |
+| PATCH | `/platform/properties/:id` | admin | `{ code, name, timezone, status, machineLimit }`, any of them: suspend or reactivate, recode, or change the machine limit. A taken code is `400` with `fields.code: taken`; everything refers to the id, so a new code moves nothing. Suspending revokes the property's sessions. A limit below the unit's machines removes nothing; it only stops more being added. |
 | POST | `/platform/properties/:id/transfer-ownership` | admin | `{ toMemberId }` — for an owner who has left. |
 | GET | `/platform/users?query=` | support | By phone, email, username or name. |
 | GET | `/platform/users/:id` | support | Memberships, sessions, last login. |
+| PATCH | `/platform/users/:id` | admin | `{ displayName, phone, email, username }`, any of them; `null` removes a sign-in identifier. One of phone, email and username must stay (`needsIdentifier`), console staff keep their email (`required`), and one someone else has is `taken`. Sessions run on. → `User`. |
 | POST | `/platform/users/:id/reset-password` | support | Temporary password, shown once. |
 | POST | `/platform/users/:id/disable` · `/enable` | admin | Across every property. |
 | DELETE | `/platform/users/:id/sessions` | support | Sign out everywhere. |
 | GET | `/platform/audit?propertyId=&actorUserId=&from=&to=&destructive=` | support | Paged. |
 | GET / POST / DELETE | `/platform/staff` | admin | Our own console users, each with `totpEnabled`. |
+| PATCH | `/platform/staff/:id` | admin | `{ displayName, email, role }`, any of them. Not one's own role (`fields.role: self`), so an admin always remains. The new role holds on the next request. |
 
 The console never shows a property's pay figures or slips; support reads
 structure (who, which role, when), not the unit's business. A read-only

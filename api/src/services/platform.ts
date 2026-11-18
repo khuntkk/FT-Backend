@@ -6,9 +6,9 @@
 // never on a unit's pay, slips or attendance; nothing here reads them.
 
 import type {
-  AuditEntry, AuditPage, CreatePropertyInput, CreatedPlatformStaff, CreatedProperty, Member,
-  PlatformRole, PlatformStaffInput, PlatformStaffMember, PlatformUser, Property, PropertyDetail,
-  PropertyPatch, PropertyStatus, PropertySummary, User,
+  AuditEntry, AuditPage, CreatePropertyInput, CreatedPlatformStaff, CreatedProperty, Member, PlatformMePatch,
+  PlatformRole, PlatformStaffInput, PlatformStaffMember, PlatformStaffPatch, PlatformUser, Property, PropertyDetail,
+  PropertyPatch, PropertyStatus, PropertySummary, User, UserPatch,
 } from '@stitchflow/contract';
 import { todayIn } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
@@ -23,6 +23,7 @@ import { MEMBER_COLUMNS, USER_COLUMNS, getMember, getProperty, getSettings, getU
 const CODE = /^[a-z0-9][a-z0-9-]{1,39}$/;
 const PHONE = /^\+[1-9][0-9]{7,14}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const USERNAME = /^[a-z0-9._-]{3,40}$/;
 
 const isTimeZone = (tz: string) => {
   try {
@@ -180,11 +181,12 @@ export async function createProperty(tx: Tx, input: CreatePropertyInput): Promis
 }
 
 const PROPERTY_PATCHABLE: Record<string, string> = {
-  name: 'name', timezone: 'timezone', status: 'status', machineLimit: 'machine_limit',
+  code: 'code', name: 'name', timezone: 'timezone', status: 'status', machineLimit: 'machine_limit',
 };
 
 function checkPatch(patch: PropertyPatch): void {
   const fields: Record<string, string> = {};
+  if (patch.code !== undefined && !CODE.test(patch.code)) fields.code = 'pattern';
   if (patch.name !== undefined && !fits(patch.name, 120)) fields.name = 'length';
   if (patch.timezone !== undefined && !isTimeZone(patch.timezone)) fields.timezone = 'unknown';
   if (patch.machineLimit !== undefined && !isMachineLimit(patch.machineLimit)) fields.machineLimit = 'range';
@@ -192,8 +194,10 @@ function checkPatch(patch: PropertyPatch): void {
 }
 
 /**
- * Renames, re-zones, suspends or reactivates, or sets the machine limit.
- * A limit below the machines the unit has removes nothing (HANDOVER §5).
+ * Recodes, renames, re-zones, suspends or reactivates, or sets the machine
+ * limit. Everything refers to a property by id, so a new code moves nothing;
+ * only what support types to find it changes. A limit below the machines the
+ * unit has removes nothing (HANDOVER §5).
  * Returns the property before and after, for the audit row.
  */
 export async function updateProperty(
@@ -209,7 +213,10 @@ export async function updateProperty(
     values.push(key === 'name' ? (value as string).trim() : value);
     sets.push(`${column} = $${values.length}`);
   }
-  if (sets.length) await tx.exec(`update properties set ${sets.join(', ')} where id = $1`, values);
+  if (sets.length) {
+    await onConstraint(tx.exec(`update properties set ${sets.join(', ')} where id = $1`, values),
+      'properties_code_key', () => invalid({ code: 'taken' }, `The code ${patch.code} is taken.`));
+  }
   // A unit that is not active cannot be used; its members sign in again
   // once it is reactivated. Access tokens still running are refused by the
   // router's status check until they expire.
@@ -314,6 +321,62 @@ export async function setUserStatus(
   return { before, after: (await getUser(tx, id))! };
 }
 
+// Unique sign-in identifiers, by the constraint that holds each.
+const IDENTIFIER_KEYS: Record<string, string> = {
+  users_phone_key: 'phone', users_email_key: 'email', users_username_key: 'username',
+};
+const USER_COLUMNS_PATCHABLE: Record<string, string> = {
+  displayName: 'display_name', username: 'username', phone: 'phone', email: 'email',
+};
+
+/** Writes the given user columns; a phone, email or username someone else has is named as taken. */
+async function setUserColumns(tx: Tx, id: number, values: UserPatch): Promise<void> {
+  const sets: string[] = [];
+  const params: unknown[] = [id];
+  for (const [key, column] of Object.entries(USER_COLUMNS_PATCHABLE)) {
+    const value = (values as Record<string, string | null | undefined>)[key];
+    if (value === undefined) continue;
+    params.push(value === null ? null : value.trim());
+    sets.push(`${column} = $${params.length}`);
+  }
+  if (!sets.length) return;
+  try {
+    await tx.exec(`update users set ${sets.join(', ')} where id = $1`, params);
+  } catch (e) {
+    const field = IDENTIFIER_KEYS[(e as { constraint?: string }).constraint ?? ''];
+    if (field) throw invalid({ [field]: 'taken' }, `That ${field} belongs to another user.`);
+    throw e;
+  }
+}
+
+/**
+ * Changes who someone is and what they sign in with. They keep at least one
+ * of phone, email and username, and console staff keep their email (the
+ * console's sign-in). Their sessions run on: the password is unchanged.
+ * Returns the user before and after, for the audit row.
+ */
+export async function updateUser(tx: Tx, id: number, patch: UserPatch): Promise<{ before: User; after: User }> {
+  const fields: Record<string, string> = {};
+  const given = (v: string | null | undefined): v is string => typeof v === 'string';
+  if (patch.displayName !== undefined && !fits(patch.displayName, 80)) fields.displayName = 'length';
+  if (given(patch.username) && !USERNAME.test(patch.username.trim())) fields.username = 'pattern';
+  if (given(patch.phone) && !PHONE.test(patch.phone.trim())) fields.phone = 'pattern';
+  if (given(patch.email) && !EMAIL.test(patch.email.trim())) fields.email = 'pattern';
+  if (Object.keys(fields).length) throw invalid(fields);
+
+  const before = await userOr404(tx, id);
+  if (patch.email === null && (await tx.one(`select 1 from platform_staff where user_id = $1`, [id]))) {
+    throw invalid({ email: 'required' }, 'Console staff sign in with their email.');
+  }
+  const kept = (key: 'username' | 'phone' | 'email') => (patch[key] !== undefined ? patch[key] : before[key]);
+  if (!kept('username') && !kept('phone') && !kept('email')) {
+    const cleared = (['phone', 'email', 'username'] as const).find((k) => patch[k] === null) ?? 'phone';
+    throw invalid({ [cleared]: 'needsIdentifier' }, 'They need a phone, email or username to sign in with.');
+  }
+  await setUserColumns(tx, id, patch);
+  return { before, after: (await getUser(tx, id))! };
+}
+
 export async function signOutEverywhere(tx: Tx, id: number): Promise<number> {
   await userOr404(tx, id);
   return revokeUserSessions(tx, id, 'signedOutBySupport');
@@ -401,6 +464,40 @@ export async function addStaff(
   );
   if (!added) throw invalid({ email: 'alreadyStaff' }, 'That user is already console staff.');
   return { staff: (await getStaff(tx, user.userId))!, temporaryPassword: user.temporaryPassword };
+}
+
+/**
+ * Changes a console user's name, sign-in email or role. No one changes their
+ * own role: an admin cannot lock themselves out, and the one making the
+ * change is always an admin, so one always remains. Returns before and after.
+ */
+export async function updateStaff(
+  tx: Tx, actorUserId: number, userId: number, patch: PlatformStaffPatch,
+): Promise<{ before: PlatformStaffMember; after: PlatformStaffMember }> {
+  const fields: Record<string, string> = {};
+  if (patch.displayName !== undefined && !fits(patch.displayName, 80)) fields.displayName = 'length';
+  if (patch.email !== undefined && !EMAIL.test(patch.email.trim())) fields.email = 'pattern';
+  if (Object.keys(fields).length) throw invalid(fields);
+
+  const before = await getStaff(tx, userId);
+  if (!before) throw notFound('No such console user.');
+  if (patch.role !== undefined && patch.role !== before.role && userId === actorUserId) {
+    throw invalid({ role: 'self' }, 'You cannot change your own role.');
+  }
+  await setUserColumns(tx, userId, { displayName: patch.displayName, email: patch.email });
+  if (patch.role !== undefined) await tx.exec(`update platform_staff set role = $2 where user_id = $1`, [userId, patch.role]);
+  return { before, after: (await getStaff(tx, userId))! };
+}
+
+/** One's own name. An email is the console's sign-in, so an admin changes it. Returns before and after. */
+export async function updateMe(
+  tx: Tx, userId: number, patch: PlatformMePatch,
+): Promise<{ before: PlatformStaffMember; after: PlatformStaffMember }> {
+  if (!fits(patch.displayName, 80)) throw invalid({ displayName: 'length' });
+  const before = await getStaff(tx, userId);
+  if (!before) throw notFound('Not console staff.');
+  await setUserColumns(tx, userId, { displayName: patch.displayName });
+  return { before, after: (await getStaff(tx, userId))! };
 }
 
 /** Ends someone's console access; their user, and any memberships, stay. Returns them as they were. */

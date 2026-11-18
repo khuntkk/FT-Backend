@@ -6,10 +6,11 @@ import * as platform from '../services/platform.ts';
 export const platformHandlers: PlatformHandlers<
   | 'GET /v1/platform/properties' | 'POST /v1/platform/properties' | 'GET /v1/platform/properties/:id'
   | 'PATCH /v1/platform/properties/:id' | 'POST /v1/platform/properties/:id/transfer-ownership'
-  | 'GET /v1/platform/users' | 'GET /v1/platform/users/:id' | 'POST /v1/platform/users/:id/reset-password'
+  | 'GET /v1/platform/users' | 'GET /v1/platform/users/:id' | 'PATCH /v1/platform/users/:id'
+  | 'POST /v1/platform/users/:id/reset-password'
   | 'POST /v1/platform/users/:id/disable' | 'POST /v1/platform/users/:id/enable'
   | 'DELETE /v1/platform/users/:id/sessions' | 'GET /v1/platform/audit'
-  | 'GET /v1/platform/staff' | 'POST /v1/platform/staff' | 'DELETE /v1/platform/staff/:id'
+  | 'GET /v1/platform/staff' | 'POST /v1/platform/staff' | 'PATCH /v1/platform/staff/:id' | 'DELETE /v1/platform/staff/:id'
 > = {
   'GET /v1/platform/properties': (c) => platform.listProperties(c.tx, c.query),
   'POST /v1/platform/properties': async (c) => {
@@ -33,6 +34,11 @@ export const platformHandlers: PlatformHandlers<
 
   'GET /v1/platform/users': (c) => platform.searchUsers(c.tx, c.query.query),
   'GET /v1/platform/users/:id': (c) => platform.getPlatformUser(c.tx, c.params.id),
+  'PATCH /v1/platform/users/:id': async (c) => {
+    const { before, after } = await platform.updateUser(c.tx, c.params.id, c.body);
+    c.audit({ entityType: 'user', entityId: after.id, before, after });
+    return after;
+  },
   'POST /v1/platform/users/:id/reset-password': async (c) => {
     const temporaryPassword = await platform.resetPassword(c.tx, c.staff.role, c.params.id);
     c.audit({ entityType: 'user', entityId: c.params.id, after: { mustChangePassword: true } });
@@ -60,6 +66,11 @@ export const platformHandlers: PlatformHandlers<
     const created = await platform.addStaff(c.tx, c.staff.userId, c.body);
     c.audit({ entityType: 'platformStaff', entityId: created.staff.userId, after: created.staff });
     return created;
+  },
+  'PATCH /v1/platform/staff/:id': async (c) => {
+    const { before, after } = await platform.updateStaff(c.tx, c.staff.userId, c.params.id, c.body);
+    c.audit({ entityType: 'platformStaff', entityId: after.userId, before, after });
+    return after;
   },
   'DELETE /v1/platform/staff/:id': async (c) => {
     const before = await platform.removeStaff(c.tx, c.staff.userId, c.params.id);

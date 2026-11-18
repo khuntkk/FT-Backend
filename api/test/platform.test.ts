@@ -73,6 +73,8 @@ describe('who may call the console', () => {
       await support.post(`/v1/platform/properties/${p.propertyId}/transfer-ownership`, { toMemberId: 1 }),
       await support.post(`/v1/platform/users/${p.members.worker.userId}/disable`),
       await support.post(`/v1/platform/users/${p.members.worker.userId}/enable`),
+      await support.patch(`/v1/platform/users/${p.members.worker.userId}`, { displayName: 'X' }),
+      await support.patch(`/v1/platform/staff/${adminId}`, { displayName: 'X' }),
       await support.get('/v1/platform/staff'),
       await support.post('/v1/platform/staff', { displayName: 'X', email: 'x@y.zz', role: 'admin' }),
       await support.del(`/v1/platform/staff/${adminId}`),
@@ -248,6 +250,28 @@ describe('changing a property', () => {
     assert.equal((await owner.get('/v1/machines')).status, 200);
   });
 
+  it('changes the code, naming a taken or malformed one; everything else follows the id', async () => {
+    const url = `/v1/platform/properties/${created.property.id}`;
+    const taken = await admin.patch(url, { code: p.code });
+    assert.equal(taken.status, 400);
+    assert.deepEqual(taken.body.error.details.fields, { code: 'taken' });
+    const bad = await admin.patch(url, { code: 'Not A Code' });
+    assert.equal(bad.status, 400);
+    assert.deepEqual(bad.body.error.details.fields, { code: 'pattern' });
+
+    const res = await admin.patch(url, { code: 'janki-creation-surat' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.code, 'janki-creation-surat');
+    assert.equal((await owner.get('/v1/machines')).status, 200);
+    const [audit] = await h.sql(
+      `select before->>'code' as before, after->>'code' as after from audit_log
+       where action = 'platform.patch /properties/:id' and entity_id = $1 order by id desc limit 1`,
+      [String(created.property.id)]);
+    assert.deepEqual(audit, { before: 'janki-creation', after: 'janki-creation-surat' });
+    // Back, for the tests that find it by its first code.
+    assert.equal((await admin.patch(url, { code: 'janki-creation' })).status, 200);
+  });
+
   it('transfers ownership to another super admin only', async () => {
     const url = `/v1/platform/properties/${p.propertyId}/transfer-ownership`;
     const notSuper = await admin.post(url, { toMemberId: p.members.admin.memberId });
@@ -341,6 +365,45 @@ describe('users', () => {
     assert.equal(u.body.liveSessions, 0);
     assert.equal((await support.del('/v1/platform/users/999999/sessions')).status, 404);
   });
+
+  it('an admin changes a user\'s name and what they sign in with; they sign in with the new one', async () => {
+    const id = p.members.supervisor.userId;
+    const res = await admin.patch(`/v1/platform/users/${id}`, {
+      displayName: ' Sunil Supervisor ', phone: '+919811111111', email: 'sunil@example.com', username: null,
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.displayName, 'Sunil Supervisor');
+    assert.equal(res.body.phone, '+919811111111');
+    assert.equal(res.body.email, 'sunil@example.com');
+    assert.equal(res.body.username, null);
+    await signIn(h, '+919811111111');
+
+    const [audit] = await h.sql(
+      `select entity_type, before->>'username' as before, after->>'phone' as after from audit_log
+       where action = 'platform.patch /users/:id' and entity_id = $1`, [String(id)]);
+    assert.deepEqual(audit, { entity_type: 'user', before: p.members.supervisor.username, after: '+919811111111' });
+  });
+
+  it('refuses a taken or malformed identifier, and leaving nothing to sign in with', async () => {
+    const url = `/v1/platform/users/${p.members.supervisor.userId}`;
+    const taken = await admin.patch(url, { phone: OWNER_PHONE });
+    assert.equal(taken.status, 400);
+    assert.deepEqual(taken.body.error.details.fields, { phone: 'taken' });
+    const takenName = await admin.patch(url, { username: p.members.admin.username.toUpperCase() });
+    assert.deepEqual(takenName.body.error.details.fields, { username: 'pattern' });
+    const takenEmail = await admin.patch(url, { email: 'JANKI@example.com' });
+    assert.deepEqual(takenEmail.body.error.details.fields, { email: 'taken' });
+    const bad = await admin.patch(url, { displayName: '', phone: '98111', email: 'no-at-sign', username: 'A B' });
+    assert.deepEqual(bad.body.error.details.fields, {
+      displayName: 'length', phone: 'pattern', email: 'pattern', username: 'pattern',
+    });
+    const nothing = await admin.patch(url, { phone: null, email: null });
+    assert.equal(nothing.status, 400);
+    assert.deepEqual(nothing.body.error.details.fields, { phone: 'needsIdentifier' });
+    const staffEmail = await admin.patch(`/v1/platform/users/${supportId}`, { email: null });
+    assert.deepEqual(staffEmail.body.error.details.fields, { email: 'required' });
+    assert.equal((await admin.patch('/v1/platform/users/999999', { displayName: 'X' })).status, 404);
+  });
 });
 
 describe('our console staff', () => {
@@ -370,6 +433,46 @@ describe('our console staff', () => {
     const changed = await newcomer.post('/v1/auth/change-password', { current: res.body.temporaryPassword, next: 'console-pass-1' });
     assert.equal(changed.status, 204);
     assert.equal((await newcomer.get('/v1/platform/properties')).status, 200);
+  });
+
+  it('an admin changes a console user\'s name, email and role, which holds at once', async () => {
+    const url = `/v1/platform/staff/${supportId}`;
+    const res = await admin.patch(url, { displayName: 'Sam Support', email: 'sam@stitchflow.test', role: 'admin' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body, {
+      userId: supportId, displayName: 'Sam Support', email: 'sam@stitchflow.test', role: 'admin', totpEnabled: false,
+    });
+    // Their token still says support; the role is read from the database.
+    assert.equal((await support.get('/v1/platform/staff')).status, 200);
+    const [audit] = await h.sql(
+      `select before->>'role' as before, after->>'role' as after from audit_log
+       where action = 'platform.patch /staff/:id' order by id desc limit 1`);
+    assert.deepEqual(audit, { before: 'support', after: 'admin' });
+
+    assert.equal((await admin.patch(url, { email: 'support@stitchflow.test', role: 'support' })).status, 200);
+    assert.equal((await support.get('/v1/platform/staff')).status, 403);
+  });
+
+  it('no one changes their own role; a taken email or a non-staff id is refused', async () => {
+    const self = await admin.patch(`/v1/platform/staff/${adminId}`, { role: 'support', displayName: 'Admin Person' });
+    assert.equal(self.status, 400);
+    assert.deepEqual(self.body.error.details.fields, { role: 'self' });
+    assert.equal((await admin.patch(`/v1/platform/staff/${adminId}`, { role: 'admin', displayName: 'Admin Person' })).status, 200);
+    const taken = await admin.patch(`/v1/platform/staff/${supportId}`, { email: 'ADMIN@stitchflow.test' });
+    assert.deepEqual(taken.body.error.details.fields, { email: 'taken' });
+    assert.equal((await admin.patch(`/v1/platform/staff/${p.members.worker.userId}`, { displayName: 'X' })).status, 404);
+  });
+
+  it('anyone changes their own name, and only that', async () => {
+    const res = await support.patch('/v1/platform/me', { displayName: 'Sam' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.displayName, 'Sam');
+    assert.equal(res.body.email, 'support@stitchflow.test');
+    const blank = await support.patch('/v1/platform/me', { displayName: '  ' });
+    assert.deepEqual(blank.body.error.details.fields, { displayName: 'length' });
+    // An email is not one's own to change here: it is ignored, as any field the contract does not name.
+    const email = await support.patch('/v1/platform/me', { displayName: 'Sam', email: 'x@y.zz' });
+    assert.equal(email.body.email, 'support@stitchflow.test');
   });
 
   it('an admin cannot remove themselves', async () => {
