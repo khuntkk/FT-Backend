@@ -95,8 +95,9 @@ export const api = createClient({
 });
 
 const properties = await api.call('GET /v1/platform/properties', { query: { query: 'janki' } });
-await api.call('PATCH /v1/platform/properties/:id', { params: { id: 7 }, body: { machineLimit: 12 } });
-await api.call('PATCH /v1/platform/properties/:id', { params: { id: 7 }, body: { status: 'suspended' } });
+const id = properties[0].id; // ids are lower-case UUID strings (contract 2.0.0)
+await api.call('PATCH /v1/platform/properties/:id', { params: { id }, body: { machineLimit: 12 } });
+await api.call('PATCH /v1/platform/properties/:id', { params: { id }, body: { status: 'suspended' } });
 ```
 
 Errors come back as `ApiRequestError` with the contract's `code` and

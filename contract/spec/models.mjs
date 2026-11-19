@@ -430,7 +430,7 @@ const SlabProblem = object({
 
 const DeletedItem = object({
   kind: ref('DeletedKind'),
-  id: doc(id, 'For attendance, the lowest id of the cleared month.'),
+  id: doc(id, 'For attendance, the first mark of the cleared month.'),
   deletedAt: instant,
   expiresAt: instant,
   name: doc(nul(str), 'What the unit called it; never translated.'),

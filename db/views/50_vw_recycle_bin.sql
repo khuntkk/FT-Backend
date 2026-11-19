@@ -75,8 +75,8 @@ from bonus_rules r, window_start w
 where r.deleted_at > w.since
 
 union all
--- The lowest id stands for the batch, as it does in the apps.
-select 'attendance', k.property_id, min(k.id), max(k.deleted_at), k.deleted_batch,
+-- The first mark made stands for the batch (ids are in creation order).
+select 'attendance', k.property_id, (array_agg(k.id order by k.id))[1], max(k.deleted_at), k.deleted_batch,
        s.name, null, null, null, date_trunc('month', min(k.work_date))::date,
        null, null, null, null, null, null, count(*)::int
 from attendance_marks k

@@ -115,7 +115,7 @@ describe('Supabase Storage', () => {
     assert.equal(res.status, 200);
     assert.ok(res.body.url.startsWith(`${url}/storage/v1/object/sign/stitchflow-photos/`));
     const [stored] = [...objects.entries()];
-    assert.match(stored[0], /^stitchflow-photos\/\d+\/[0-9a-f-]+\.png$/);
+    assert.match(stored[0], /^stitchflow-photos\/[0-9a-f-]{36}\/[0-9a-f-]+\.png$/);
     assert.equal(stored[1].type, 'image/png');
     assert.deepEqual(stored[1].bytes, png());
 

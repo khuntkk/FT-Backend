@@ -3,9 +3,7 @@
 // and returns what the contract says the route returns.
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type {
-  AccountStatus, ActionKey, ApiRoutes, PlatformRole, PropertyStatus, RouteKey, UserRole,
-} from '@stitchflow/contract';
+import type { AccountStatus, ActionKey, ApiRoutes, Id, PlatformRole, PropertyStatus, RouteKey, UserRole } from '@stitchflow/contract';
 import type { AccessClaims } from '../auth/tokens.ts';
 import type { Tx } from '../db/db.ts';
 import type { Config } from '../config.ts';
@@ -14,12 +12,12 @@ import type { EventBus } from './events.ts';
 
 /** The signed-in member a request acts as. */
 export interface Member {
-  memberId: number;
-  userId: number;
-  propertyId: number;
+  memberId: Id;
+  userId: Id;
+  propertyId: Id;
   role: UserRole;
   isOwner: boolean;
-  staffId: number | null;
+  staffId: Id | null;
   displayName: string;
   memberStatus: AccountStatus;
   userStatus: AccountStatus;
@@ -34,7 +32,7 @@ export interface Member {
 }
 
 export interface PlatformStaff {
-  userId: number;
+  userId: Id;
   role: PlatformRole;
 }
 
@@ -47,7 +45,7 @@ export interface AuditNote {
   /** Override the action recorded (defaults to the route's action, or platform.<route>). */
   action?: string;
   /** Console actions: the property the change touched, when the path does not name it. */
-  propertyId?: number;
+  propertyId?: Id;
   /** Write an audit row even though the route is not destructive. */
   force?: boolean;
 }
@@ -87,7 +85,7 @@ export interface MemberCall<K extends RouteKey> extends CallBase<K> {
   member: Member;
   assertCan(action: ActionKey): Promise<void>;
   /** Tells the property's live listeners (GET /v1/events) after commit. */
-  changed(table: string, ids: number[]): void;
+  changed(table: string, ids: Id[]): void;
 }
 
 /** Our console staff. */

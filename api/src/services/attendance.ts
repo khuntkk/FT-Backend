@@ -6,7 +6,7 @@
 // written here. Clearing is soft; only "clear this month" carries a batch,
 // so only it lands in the recycle bin as one item.
 
-import type { AttendanceDay, AttendanceStatus, HajariDay, Month, StaffCategory, StaffHajari } from '@stitchflow/contract';
+import type { AttendanceDay, AttendanceStatus, HajariDay, Id, Month, StaffCategory, StaffHajari } from '@stitchflow/contract';
 import { monthRange } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { ApiError, invalid, notFound } from '../http/errors.ts';
@@ -25,7 +25,7 @@ export function day(tx: Tx, member: Member, date: string, category?: StaffCatego
      from staff s
      left join vw_attendance_days d on d.staff_id = s.id and d.work_date = $1::date
      where s.deleted_at is null and s.is_active and ($2::text is null or s.category = $2)
-       and (not $3::boolean or s.id = $4::bigint)
+       and (not $3::boolean or s.id = $4::uuid)
      order by s.name, s.id`,
     [date, category ?? null, member.role === 'worker', member.staffId],
   );
@@ -54,7 +54,7 @@ export async function daily(tx: Tx, month: Month): Promise<Record<string, Attend
 }
 
 /** One person's every date in [from, to], both inclusive. A worker may read only their own. */
-export async function forStaff(tx: Tx, member: Member, staffId: number, from: string, to: string): Promise<HajariDay[]> {
+export async function forStaff(tx: Tx, member: Member, staffId: Id, from: string, to: string): Promise<HajariDay[]> {
   if (member.role === 'worker' && member.staffId !== staffId) {
     throw new ApiError('forbidden', 'An operator sees only their own attendance.', { action: 'attendance.view' });
   }
@@ -78,9 +78,9 @@ export async function forStaff(tx: Tx, member: Member, staffId: number, from: st
  * half day — one allowed half days. The app never offers half a day to such
  * a person; the server holds the same line, as it holds the pay.
  */
-async function requirePeople(tx: Tx, ids: number[], status?: AttendanceStatus): Promise<void> {
-  const rows = await tx.rows<{ id: number; allowHalfDay: boolean }>(
-    `select id, allow_half_day as "allowHalfDay" from staff where id = any($1::bigint[]) and deleted_at is null`,
+async function requirePeople(tx: Tx, ids: Id[], status?: AttendanceStatus): Promise<void> {
+  const rows = await tx.rows<{ id: Id; allowHalfDay: boolean }>(
+    `select id, allow_half_day as "allowHalfDay" from staff where id = any($1::uuid[]) and deleted_at is null`,
     [ids],
   );
   if (rows.length !== new Set(ids).size) throw notFound('No such person.');
@@ -98,13 +98,13 @@ async function requirePeople(tx: Tx, ids: number[], status?: AttendanceStatus): 
  * batch it was cleared in, so restoring that clear later cannot overwrite
  * what was chosen since.
  */
-async function upsertMarks(tx: Tx, member: Member, staffIds: number[], dates: string[], status: AttendanceStatus) {
+async function upsertMarks(tx: Tx, member: Member, staffIds: Id[], dates: string[], status: AttendanceStatus) {
   if (!staffIds.length || !dates.length) return;
   await requirePeople(tx, staffIds, status);
   await tx.exec(
     `insert into attendance_marks (property_id, staff_id, work_date, status, created_by_member_id, updated_by_member_id)
      select $1, s, d, $4, $5, $5
-     from (select distinct unnest($2::bigint[])) ids(s), (select distinct unnest($3::date[])) days(d)
+     from (select distinct unnest($2::uuid[])) ids(s), (select distinct unnest($3::date[])) days(d)
      on conflict (staff_id, work_date) do update
        set status = excluded.status, deleted_at = null, deleted_by_member_id = null, deleted_batch = null,
            updated_by_member_id = excluded.updated_by_member_id`,
@@ -112,19 +112,19 @@ async function upsertMarks(tx: Tx, member: Member, staffIds: number[], dates: st
   );
 }
 
-export const mark = (tx: Tx, member: Member, staffId: number, date: string, status: AttendanceStatus) =>
+export const mark = (tx: Tx, member: Member, staffId: Id, date: string, status: AttendanceStatus) =>
   upsertMarks(tx, member, [staffId], [date], status);
 
 /** Fills in many dates for one person. */
-export const markMany = (tx: Tx, member: Member, staffId: number, dates: string[], status: AttendanceStatus) =>
+export const markMany = (tx: Tx, member: Member, staffId: Id, dates: string[], status: AttendanceStatus) =>
   upsertMarks(tx, member, [staffId], dates, status);
 
 /** Marks many people on one date — "mark the rest present". */
-export const markAll = (tx: Tx, member: Member, staffIds: number[], date: string, status: AttendanceStatus) =>
+export const markAll = (tx: Tx, member: Member, staffIds: Id[], date: string, status: AttendanceStatus) =>
   upsertMarks(tx, member, staffIds, [date], status);
 
 /** A day back to unmarked: hidden, with no batch, so not in the bin. */
-export async function unmark(tx: Tx, member: Member, staffId: number, date: string): Promise<void> {
+export async function unmark(tx: Tx, member: Member, staffId: Id, date: string): Promise<void> {
   await requirePeople(tx, [staffId]);
   await tx.exec(
     `update attendance_marks set deleted_at = now(), deleted_by_member_id = $3, updated_by_member_id = $3
@@ -137,23 +137,23 @@ export async function unmark(tx: Tx, member: Member, staffId: number, date: stri
  * Undoes "mark the rest present": clears those people's live marks on that
  * date, as the app's clearAll does. An undo, not a deletion — no batch.
  */
-export async function undoMarkAll(tx: Tx, member: Member, staffIds: number[], date: string): Promise<void> {
+export async function undoMarkAll(tx: Tx, member: Member, staffIds: Id[], date: string): Promise<void> {
   if (!staffIds.length) return;
   await tx.exec(
     `update attendance_marks set deleted_at = now(), deleted_by_member_id = $3, updated_by_member_id = $3
-     where staff_id = any($1::bigint[]) and work_date = $2 and deleted_at is null`,
+     where staff_id = any($1::uuid[]) and work_date = $2 and deleted_at is null`,
     [staffIds, date, member.memberId],
   );
 }
 
 export interface ClearedMonth {
-  staffId: number;
+  staffId: Id;
   month: Month;
-  marks: { id: number; date: string; status: AttendanceStatus }[];
+  marks: { id: Id; date: string; status: AttendanceStatus }[];
 }
 
 /** Clears a person's live marks in a month under one batch: one item in the bin. Returns what was cleared. */
-export async function clearMonth(tx: Tx, member: Member, staffId: number, month: Month): Promise<ClearedMonth> {
+export async function clearMonth(tx: Tx, member: Member, staffId: Id, month: Month): Promise<ClearedMonth> {
   await requirePeople(tx, [staffId]);
   const { start, end } = monthRange(month);
   const marks = await tx.rows<ClearedMonth['marks'][number]>(

@@ -8,6 +8,7 @@
 // fn_member_can is the authority on what a member may do; the contract's
 // refusal() only picks which 403 code explains a "no".
 
+import type { Id } from '@stitchflow/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ROUTES, refusal, type ActionKey, type RouteInfo } from '@stitchflow/contract';
 import { verifyAccessToken, type AccessClaims } from '../auth/tokens.ts';
@@ -178,7 +179,7 @@ async function dispatch(
       if (earlier) return new Replay(earlier.status_code, earlier.response);
     }
 
-    const changed = (table: string, ids: number[]) =>
+    const changed = (table: string, ids: Id[]) =>
       tx.afterCommit(() => services.events.emit(m.propertyId, { table, ids }));
     const result = await handler({ ...base, tx, claims, member: m, assertCan, changed });
 
@@ -244,7 +245,7 @@ function gate(member: Member, route: RouteInfo): void {
   }
 }
 
-async function gatePasswordForUser(tx: Tx, userId: number, route: RouteInfo): Promise<void> {
+async function gatePasswordForUser(tx: Tx, userId: Id, route: RouteInfo): Promise<void> {
   if (route.path.startsWith('/v1/auth/') || route.path === '/v1/me') return;
   const u = await tx.one(`select must_change_password from users where id = $1`, [userId]);
   if (u?.must_change_password) throw new ApiError('password_change_required', 'Change the temporary password first.');
@@ -270,7 +271,7 @@ function refuseUnless(member: Member, action: ActionKey, allowed: boolean | null
   throw new ApiError(code, `Not allowed: ${action}.`, { action });
 }
 
-async function loadStaff(tx: Tx, userId: number, sid: string): Promise<PlatformStaff & { totpOn: boolean }> {
+async function loadStaff(tx: Tx, userId: Id, sid: string): Promise<PlatformStaff & { totpOn: boolean }> {
   const s = await tx.one<PlatformStaff & { status: string; must_change_password: boolean; sessionLive: boolean; totpOn: boolean }>(
     `select ps.user_id as "userId", ps.role, ps.totp_enabled_at is not null as "totpOn", u.status, u.must_change_password,
             exists (select 1 from auth_sessions cur join auth_sessions own on own.family_id = cur.family_id

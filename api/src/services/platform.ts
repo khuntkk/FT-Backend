@@ -5,12 +5,8 @@
 // The console works on structure — properties, who signs in, which role —
 // never on a unit's pay, slips or attendance; nothing here reads them.
 
-import type {
-  AuditEntry, AuditPage, CreatePropertyInput, CreatedPlatformStaff, CreatedProperty, Member, PlatformMePatch,
-  PlatformRole, PlatformStaffInput, PlatformStaffMember, PlatformStaffPatch, PlatformUser, Property, PropertyDetail,
-  PropertyPatch, PropertyStatus, PropertySummary, User, UserPatch,
-} from '@stitchflow/contract';
-import { todayIn } from '@stitchflow/contract';
+import type { AuditEntry, AuditPage, CreatedPlatformStaff, CreatedProperty, CreatePropertyInput, Id, Member, PlatformMePatch, PlatformRole, PlatformStaffInput, PlatformStaffMember, PlatformStaffPatch, PlatformUser, Property, PropertyDetail, PropertyPatch, PropertyStatus, PropertySummary, User, UserPatch } from '@stitchflow/contract';
+import { isId, todayIn } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { ApiError, invalid, notFound, onConstraint } from '../http/errors.ts';
 import { hashPassword, temporaryPassword } from '../auth/passwords.ts';
@@ -41,7 +37,7 @@ const fits = (s: string, max: number) => s.trim().length >= 1 && s.trim().length
 const contains = (text: string) => `%${text.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 
 /** A new temporary password for a user, who must replace it at the next sign-in. Returns it, for showing once. */
-async function issueTemporaryPassword(tx: Tx, userId: number): Promise<string> {
+async function issueTemporaryPassword(tx: Tx, userId: Id): Promise<string> {
   const password = temporaryPassword();
   await tx.exec(`update users set password_hash = $2, must_change_password = true where id = $1`,
     [userId, await hashPassword(password)]);
@@ -64,14 +60,14 @@ interface NewUser {
  */
 async function findOrCreateUser(
   tx: Tx, by: 'phone' | 'email', input: NewUser, emailField: string,
-): Promise<{ userId: number; temporaryPassword: string }> {
-  const found = await tx.one<{ id: number; has_password: boolean }>(
+): Promise<{ userId: Id; temporaryPassword: string }> {
+  const found = await tx.one<{ id: Id; has_password: boolean }>(
     `select id, password_hash is not null as has_password from users where ${by} = $1`, [input[by]]);
   if (found) {
     return { userId: found.id, temporaryPassword: found.has_password ? '' : await issueTemporaryPassword(tx, found.id) };
   }
   const password = temporaryPassword();
-  const created = await onConstraint(tx.one<{ id: number }>(
+  const created = await onConstraint(tx.one<{ id: Id }>(
     `insert into users (display_name, phone, email, password_hash, must_change_password)
      values ($1, $2, $3, $4, true) returning id`,
     [input.displayName.trim(), input.phone ?? null, input.email ?? null, await hashPassword(password)],
@@ -107,13 +103,13 @@ export function listProperties(
   );
 }
 
-async function propertyOr404(tx: Tx, id: number): Promise<Property> {
+async function propertyOr404(tx: Tx, id: Id): Promise<Property> {
   const p = await getProperty(tx, id);
   if (!p) throw notFound('No such property.');
   return p;
 }
 
-export async function getPropertyDetail(tx: Tx, id: number): Promise<PropertyDetail> {
+export async function getPropertyDetail(tx: Tx, id: Id): Promise<PropertyDetail> {
   const property = await propertyOr404(tx, id);
   const members = await tx.rows<Member>(
     `select ${MEMBER_COLUMNS} from property_members m join users u on u.id = m.user_id
@@ -145,7 +141,7 @@ function checkCreateInput(input: CreatePropertyInput): void {
 export async function createProperty(tx: Tx, input: CreatePropertyInput): Promise<CreatedProperty> {
   checkCreateInput(input);
   const timezone = input.timezone ?? 'Asia/Kolkata';
-  const row = await onConstraint(tx.one<{ id: number }>(
+  const row = await onConstraint(tx.one<{ id: Id }>(
     `insert into properties (code, name, timezone, machine_limit) values ($1, $2, $3, $4) returning id`,
     [input.code, input.name.trim(), timezone, input.machineLimit],
   ), 'properties_code_key', () => invalid({ code: 'taken' }, `The code ${input.code} is taken.`));
@@ -168,7 +164,7 @@ export async function createProperty(tx: Tx, input: CreatePropertyInput): Promis
   const owner = await findOrCreateUser(tx, 'phone', {
     displayName: input.owner.displayName, phone: input.owner.phone, email: input.owner.email,
   }, 'owner.email');
-  const member = await tx.one<{ id: number }>(
+  const member = await tx.one<{ id: Id }>(
     `insert into property_members (property_id, user_id, role, is_owner)
      values ($1, $2, 'superAdmin', true) returning id`,
     [propertyId, owner.userId],
@@ -201,7 +197,7 @@ function checkPatch(patch: PropertyPatch): void {
  * Returns the property before and after, for the audit row.
  */
 export async function updateProperty(
-  tx: Tx, id: number, patch: PropertyPatch,
+  tx: Tx, id: Id, patch: PropertyPatch,
 ): Promise<{ before: Property; after: Property }> {
   checkPatch(patch);
   const before = await propertyOr404(tx, id);
@@ -232,8 +228,8 @@ export async function updateProperty(
 
 /** Moves ownership to another super admin of the property. Returns the old and new owner's member ids. */
 export async function transferOwnership(
-  tx: Tx, propertyId: number, toMemberId: number,
-): Promise<{ from: number | null; to: number }> {
+  tx: Tx, propertyId: Id, toMemberId: Id,
+): Promise<{ from: Id | null; to: Id }> {
   const to = await tx.one<{ role: string; status: string; is_owner: boolean }>(
     `select role, status, is_owner from property_members where id = $1 and property_id = $2`,
     [toMemberId, propertyId],
@@ -245,7 +241,7 @@ export async function transferOwnership(
   if (to.status !== 'active') throw invalid({ toMemberId: 'disabled' }, 'That member is switched off.');
   if (to.is_owner) return { from: toMemberId, to: toMemberId };
   // At most one owner per property (property_members_one_owner): clear first.
-  const from = await tx.one<{ id: number }>(
+  const from = await tx.one<{ id: Id }>(
     `update property_members set is_owner = false where property_id = $1 and is_owner returning id`, [propertyId]);
   await tx.exec(`update property_members set is_owner = true where id = $1`, [toMemberId]);
   return { from: from?.id ?? null, to: toMemberId };
@@ -282,13 +278,13 @@ export async function searchUsers(tx: Tx, query: string): Promise<PlatformUser[]
   return rows.map(toPlatformUser);
 }
 
-export async function getPlatformUser(tx: Tx, id: number): Promise<PlatformUser> {
+export async function getPlatformUser(tx: Tx, id: Id): Promise<PlatformUser> {
   const row = await tx.one<PlatformUserRow>(`${PLATFORM_USER_SQL} where u.id = $1`, [id]);
   if (!row) throw notFound('No such user.');
   return toPlatformUser(row);
 }
 
-async function userOr404(tx: Tx, id: number): Promise<User> {
+async function userOr404(tx: Tx, id: Id): Promise<User> {
   const u = await getUser(tx, id);
   if (!u) throw notFound('No such user.');
   return u;
@@ -299,7 +295,7 @@ async function userOr404(tx: Tx, id: number): Promise<User> {
  * unit's user but not one of our own staff: that would hand support an
  * admin's sign-in.
  */
-export async function resetPassword(tx: Tx, actorRole: PlatformRole, id: number): Promise<string> {
+export async function resetPassword(tx: Tx, actorRole: PlatformRole, id: Id): Promise<string> {
   await userOr404(tx, id);
   if (actorRole !== 'admin') {
     const staff = await tx.one(`select 1 from platform_staff where user_id = $1`, [id]);
@@ -312,7 +308,7 @@ export async function resetPassword(tx: Tx, actorRole: PlatformRole, id: number)
 
 /** Switches a user off or on in every property. Off ends their sessions. Returns before and after. */
 export async function setUserStatus(
-  tx: Tx, actorUserId: number, id: number, status: 'active' | 'disabled',
+  tx: Tx, actorUserId: Id, id: Id, status: 'active' | 'disabled',
 ): Promise<{ before: User; after: User }> {
   const before = await userOr404(tx, id);
   if (status === 'disabled' && id === actorUserId) throw invalid({ id: 'self' }, 'You cannot switch yourself off.');
@@ -330,7 +326,7 @@ const USER_COLUMNS_PATCHABLE: Record<string, string> = {
 };
 
 /** Writes the given user columns; a phone, email or username someone else has is named as taken. */
-async function setUserColumns(tx: Tx, id: number, values: UserPatch): Promise<void> {
+async function setUserColumns(tx: Tx, id: Id, values: UserPatch): Promise<void> {
   const sets: string[] = [];
   const params: unknown[] = [id];
   for (const [key, column] of Object.entries(USER_COLUMNS_PATCHABLE)) {
@@ -355,7 +351,7 @@ async function setUserColumns(tx: Tx, id: number, values: UserPatch): Promise<vo
  * console's sign-in). Their sessions run on: the password is unchanged.
  * Returns the user before and after, for the audit row.
  */
-export async function updateUser(tx: Tx, id: number, patch: UserPatch): Promise<{ before: User; after: User }> {
+export async function updateUser(tx: Tx, id: Id, patch: UserPatch): Promise<{ before: User; after: User }> {
   const fields: Record<string, string> = {};
   const given = (v: string | null | undefined): v is string => typeof v === 'string';
   if (patch.displayName !== undefined && !fits(patch.displayName, 80)) fields.displayName = 'length';
@@ -377,7 +373,7 @@ export async function updateUser(tx: Tx, id: number, patch: UserPatch): Promise<
   return { before, after: (await getUser(tx, id))! };
 }
 
-export async function signOutEverywhere(tx: Tx, id: number): Promise<number> {
+export async function signOutEverywhere(tx: Tx, id: Id): Promise<number> {
   await userOr404(tx, id);
   return revokeUserSessions(tx, id, 'signedOutBySupport');
 }
@@ -385,8 +381,8 @@ export async function signOutEverywhere(tx: Tx, id: number): Promise<number> {
 // --- Audit log ----------------------------------------------------------------
 
 export interface AuditQuery {
-  propertyId?: number;
-  actorUserId?: number;
+  propertyId?: Id;
+  actorUserId?: Id;
   from?: string;
   to?: string;
   destructive?: boolean;
@@ -396,11 +392,11 @@ export interface AuditQuery {
 
 // The cursor is the id of the last entry on the page; the next page starts
 // below that entry's (occurred_at, id). Opaque to the console.
-const encodeCursor = (id: number) => Buffer.from(String(id)).toString('base64url');
-function decodeCursor(cursor: string): number {
+const encodeCursor = (id: Id) => Buffer.from(id).toString('base64url');
+function decodeCursor(cursor: string): Id {
   const s = Buffer.from(cursor, 'base64url').toString();
-  if (!/^[1-9][0-9]{0,15}$/.test(s)) throw invalid({ cursor: 'invalid' });
-  return Number(s);
+  if (!isId(s)) throw invalid({ cursor: 'invalid' });
+  return s;
 }
 
 /** Newest first. from/to are UTC dates, both inclusive. */
@@ -413,12 +409,12 @@ export async function listAudit(tx: Tx, q: AuditQuery): Promise<AuditPage> {
             a.entity_type as "entityType", a.entity_id as "entityId", a.destructive, a.before, a.after,
             a.request_id as "requestId"
      from audit_log a
-     where ($1::bigint is null or a.property_id = $1)
-       and ($2::bigint is null or a.actor_user_id = $2)
+     where ($1::uuid is null or a.property_id = $1)
+       and ($2::uuid is null or a.actor_user_id = $2)
        and ($3::date is null or a.occurred_at >= $3::date::timestamp at time zone 'UTC')
        and ($4::date is null or a.occurred_at < ($4::date + 1)::timestamp at time zone 'UTC')
        and ($5::boolean is null or a.destructive = $5)
-       and ($6::bigint is null or (a.occurred_at, a.id) < (select c.occurred_at, c.id from audit_log c where c.id = $6))
+       and ($6::uuid is null or (a.occurred_at, a.id) < (select c.occurred_at, c.id from audit_log c where c.id = $6))
      order by a.occurred_at desc, a.id desc
      limit $7`,
     [q.propertyId ?? null, q.actorUserId ?? null, q.from ?? null, q.to ?? null, q.destructive ?? null,
@@ -440,7 +436,7 @@ export function listStaff(tx: Tx): Promise<PlatformStaffMember[]> {
   return tx.rows<PlatformStaffMember>(`${STAFF_SQL} order by u.display_name, ps.user_id`);
 }
 
-export async function getStaff(tx: Tx, userId: number): Promise<PlatformStaffMember | undefined> {
+export async function getStaff(tx: Tx, userId: Id): Promise<PlatformStaffMember | undefined> {
   return tx.one<PlatformStaffMember>(`${STAFF_SQL} where ps.user_id = $1`, [userId]);
 }
 
@@ -450,7 +446,7 @@ export async function getStaff(tx: Tx, userId: number): Promise<PlatformStaffMem
  * script because no one can sign in to make them.
  */
 export async function addStaff(
-  tx: Tx, createdBy: number | null, input: PlatformStaffInput,
+  tx: Tx, createdBy: Id | null, input: PlatformStaffInput,
 ): Promise<CreatedPlatformStaff> {
   const fields: Record<string, string> = {};
   if (!fits(input.displayName, 80)) fields.displayName = 'length';
@@ -472,7 +468,7 @@ export async function addStaff(
  * change is always an admin, so one always remains. Returns before and after.
  */
 export async function updateStaff(
-  tx: Tx, actorUserId: number, userId: number, patch: PlatformStaffPatch,
+  tx: Tx, actorUserId: Id, userId: Id, patch: PlatformStaffPatch,
 ): Promise<{ before: PlatformStaffMember; after: PlatformStaffMember }> {
   const fields: Record<string, string> = {};
   if (patch.displayName !== undefined && !fits(patch.displayName, 80)) fields.displayName = 'length';
@@ -491,7 +487,7 @@ export async function updateStaff(
 
 /** One's own name. An email is the console's sign-in, so an admin changes it. Returns before and after. */
 export async function updateMe(
-  tx: Tx, userId: number, patch: PlatformMePatch,
+  tx: Tx, userId: Id, patch: PlatformMePatch,
 ): Promise<{ before: PlatformStaffMember; after: PlatformStaffMember }> {
   if (!fits(patch.displayName, 80)) throw invalid({ displayName: 'length' });
   const before = await getStaff(tx, userId);
@@ -501,7 +497,7 @@ export async function updateMe(
 }
 
 /** Ends someone's console access; their user, and any memberships, stay. Returns them as they were. */
-export async function removeStaff(tx: Tx, actorUserId: number, userId: number): Promise<PlatformStaffMember> {
+export async function removeStaff(tx: Tx, actorUserId: Id, userId: Id): Promise<PlatformStaffMember> {
   if (userId === actorUserId) throw invalid({ id: 'self' }, 'You cannot remove yourself.');
   const before = await getStaff(tx, userId);
   if (!before) throw notFound('No such console user.');

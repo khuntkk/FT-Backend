@@ -5,13 +5,13 @@ import { seedProperty, signInAll, startHarness, type Client, type Harness, type 
 let h: Harness;
 let p: SeededProperty;
 let as: Record<string, Client>;
-let meena: number;
-let ravi: number;
-let sita: number;
-let uday: number;
-let idle: number;
-let machine: number;
-let dayShift: number;
+let meena: string;
+let ravi: string;
+let sita: string;
+let uday: string;
+let idle: string;
+let machine: string;
+let dayShift: string;
 
 async function person(name: string, salary: number, extra: Record<string, unknown> = {}, propertyId = p.propertyId) {
   const cols = ['property_id', 'name', 'monthly_salary', ...Object.keys(extra)];
@@ -19,10 +19,10 @@ async function person(name: string, salary: number, extra: Record<string, unknow
     `insert into staff (${cols.join(', ')}) values (${cols.map((_, i) => `$${i + 1}`).join(', ')}) returning id`,
     [propertyId, name, salary, ...Object.values(extra)],
   );
-  return id as number;
+  return id as string;
 }
 
-async function slip(date: string, crew: number[], o: { bonus: number; stitches: number; stitchBased?: boolean }) {
+async function slip(date: string, crew: string[], o: { bonus: number; stitches: number; stitchBased?: boolean }) {
   const [{ id }] = await h.sql(
     `insert into production_entries (property_id, machine_id, work_date, shift_id, bonus_amount, total_stitches,
                                      is_stitch_based)
@@ -37,10 +37,10 @@ async function slip(date: string, crew: number[], o: { bonus: number; stitches: 
 
 const september = Array.from({ length: 30 }, (_, i) => `2026-09-${String(i + 1).padStart(2, '0')}`);
 
-const rowOf = async (month: string, staffId: number) =>
+const rowOf = async (month: string, staffId: string) =>
   (await as.admin.get('/v1/payroll/preview', { month })).body.find((r: any) => r.staff.id === staffId);
 
-const pay = (staffId: number, month: string, extra: Record<string, unknown> = {}) =>
+const pay = (staffId: string, month: string, extra: Record<string, unknown> = {}) =>
   as.admin.post('/v1/payroll/payslips', { staffId, month, ...extra });
 
 before(async () => {

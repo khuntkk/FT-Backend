@@ -21,7 +21,7 @@ action is super admin only whatever the module level.
 | Base path | `/v1`. The platform console's endpoints are under `/v1/platform`. |
 | Format | JSON, `camelCase` keys. `Content-Type: application/json` except file upload. |
 | Auth | `Authorization: Bearer <accessToken>`. The token names the user and the property membership it acts in; no endpoint takes a property id. |
-| Ids | JSON numbers (Postgres `bigint`; safely below 2^53). Files are UUID strings. |
+| Ids | Lower-case UUID strings (version 7, time-ordered), e.g. `0193a5c2-7d1e-7c3a-9b2f-4e8d1a6c0b55`. Never numbers; upper case is refused with `400`. Since contract 2.0.0 (19 November 2026); before that, ids were numbers. |
 | Dates | `"YYYY-MM-DD"` for anything without a time: work dates, pay periods, a shift's effective dates, when an advance was given. **Never** an instant at local midnight. |
 | Instants | ISO-8601 in UTC with `Z`: `"2026-09-27T09:30:00Z"`. |
 | Money | JSON numbers, two decimals, already rounded to the paisa by the server. Rates may carry four. |
@@ -224,7 +224,7 @@ Purging items past seven days is a **scheduled job** (daily), not an endpoint an
 | GET | `/files/:id` | view on the owning module | `302` to a short-lived signed URL. |
 
 ### Live updates
-`GET /v1/events` — Server-Sent Events: `{ "table": "production_entries", "ids": [...] }` after each write in the property, sent only to members who may view that table (decided when the stream opens; a stream ends with `event: bye` when its member is disabled, removed or has their access changed), so the apps refresh the stream that shows it instead of polling. Sent as `event: change`, with a `: ping` comment every 25 s. The apps also refetch after their own writes and on resume.
+`GET /v1/events` — Server-Sent Events: `{ "table": "production_entries", "ids": ["<uuid>", …] }` after each write in the property, sent only to members who may view that table (decided when the stream opens; a stream ends with `event: bye` when its member is disabled, removed or has their access changed), so the apps refresh the stream that shows it instead of polling. Sent as `event: change`, with a `: ping` comment every 25 s. The apps also refetch after their own writes and on resume.
 
 ---
 

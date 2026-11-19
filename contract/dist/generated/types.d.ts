@@ -1,6 +1,8 @@
 import type { ActionKey, ModuleKey } from './catalog.js';
 import type { ErrorCode } from './errors.js';
 export type { ActionKey, ModuleKey, ErrorCode };
+/** A server-issued id: a lower-case, time-ordered UUID. */
+export type Id = string;
 /** A calendar date with no time: "YYYY-MM-DD". */
 export type DateOnly = string;
 /** An instant, ISO-8601 UTC: "2026-09-27T09:30:00Z". */
@@ -54,8 +56,8 @@ export type SlabProblemKind = "empty" | "inverted" | "openEndedNotLast" | "overl
 export declare const SlabProblemKindValues: readonly ["empty", "inverted", "openEndedNotLast", "overlap", "gap"];
 /** One customer's unit — the tenant. */
 export interface Property {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     /** Short handle, e.g. "janki-creation". */
     code: string;
     name: string;
@@ -80,8 +82,8 @@ export interface PropertySettings {
 }
 /** A person who can sign in. Never carries a password hash. */
 export interface User {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     displayName: string;
     username: string | null;
     /** E.164, e.g. "+919812345678". */
@@ -92,10 +94,10 @@ export interface User {
     lastLoginAt: Instant | null;
 }
 export interface Membership {
-    /** Server-issued id. */
-    memberId: number;
-    /** Server-issued id. */
-    propertyId: number;
+    /** Server-issued id: a lower-case UUID. */
+    memberId: Id;
+    /** Server-issued id: a lower-case UUID. */
+    propertyId: Id;
     propertyCode: string;
     propertyName: string;
     role: UserRole;
@@ -108,10 +110,10 @@ export interface ModuleAccess {
 }
 /** A user's place in a property. */
 export interface Member {
-    /** Server-issued id. */
-    id: number;
-    /** Server-issued id. */
-    userId: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
+    /** Server-issued id: a lower-case UUID. */
+    userId: Id;
     displayName: string;
     /** What they sign in with, with phone and email: the apps switch to this person by it. */
     username: string | null;
@@ -123,7 +125,7 @@ export interface Member {
     isOwner: boolean;
     status: AccountStatus;
     /** The roster row this login is, if any. */
-    staffId: number | null;
+    staffId: Id | null;
     modules: ModuleAccess[];
     createdAt: Instant;
 }
@@ -136,8 +138,8 @@ export interface Me {
     modules: ModuleAccess[];
 }
 export interface Machine {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     /** The painted number; unique among live machines. */
     number: number;
     name: string | null;
@@ -153,8 +155,8 @@ export interface Machine {
 }
 /** A person on the roster. Carries pay: supervisors never receive this shape. */
 export interface Staff {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     code: string | null;
     name: string;
     phone: string | null;
@@ -176,8 +178,8 @@ export interface Staff {
 }
 /** A person without pay, for pickers and attendance — what a supervisor may see. */
 export interface Person {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     name: string;
     code: string | null;
     category: StaffCategory;
@@ -189,9 +191,9 @@ export interface Person {
 /** One version of a shift. Editing opens a new version from a date. */
 export interface Shift {
     /** This version. */
-    id: number;
+    id: Id;
     /** The shift all its versions belong to; equals id for a first version. */
-    lineageId: number;
+    lineageId: Id;
     name: string;
     startMinute: number;
     /** 1–1440. */
@@ -203,13 +205,13 @@ export interface Shift {
     effectiveTo: DateOnly | null;
 }
 export interface ProductionEntry {
-    /** Server-issued id. */
-    id: number;
-    /** Server-issued id. */
-    machineId: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
+    /** Server-issued id: a lower-case UUID. */
+    machineId: Id;
     workDate: DateOnly;
     /** A shift version in effect on workDate. */
-    shiftId: number;
+    shiftId: Id;
     totalStitches: number;
     embMinutes: number;
     stopMinutes: number;
@@ -267,11 +269,11 @@ export interface OcrLine {
 }
 /** What to save for one machine, date and shift. Upserts. */
 export interface EntryDraft {
-    /** Server-issued id. */
-    machineId: number;
+    /** Server-issued id: a lower-case UUID. */
+    machineId: Id;
     workDate: DateOnly;
-    /** Server-issued id. */
-    shiftId: number;
+    /** Server-issued id: a lower-case UUID. */
+    shiftId: Id;
     totalStitches: number;
     embMinutes: number;
     stopMinutes: number;
@@ -288,17 +290,17 @@ export interface EntryDraft {
     note?: string | null;
     slipPhotoFileId?: string | null;
     /** The report scan that filled this slip. */
-    scanId?: number | null;
+    scanId?: Id | null;
     karigars: KarigarOnEntry[];
 }
 export interface KarigarOnEntry {
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     isHalfDay: boolean;
 }
 export interface ScanInput {
-    /** Server-issued id. */
-    machineId: number;
+    /** Server-issued id: a lower-case UUID. */
+    machineId: Id;
     photoFileId: string;
     engine: ScanEngine;
     lines: OcrLine[];
@@ -323,36 +325,36 @@ export interface AttendanceDay {
     unmarked: number;
 }
 export interface MarkInput {
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     date: DateOnly;
     status: AttendanceStatus;
 }
 export interface MarkManyInput {
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     dates: DateOnly[];
     status: AttendanceStatus;
 }
 export interface MarkAllInput {
-    staffIds: number[];
+    staffIds: Id[];
     date: DateOnly;
     status: AttendanceStatus;
 }
 export interface UndoMarkAllInput {
-    staffIds: number[];
+    staffIds: Id[];
     date: DateOnly;
 }
 export interface ClearMonthInput {
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     month: Month;
 }
 export interface Advance {
-    /** Server-issued id. */
-    id: number;
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     givenOn: DateOnly;
     /** Rupees, two decimals. */
     amount: number;
@@ -361,8 +363,8 @@ export interface Advance {
     createdAt: Instant;
 }
 export interface AdvanceInput {
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     givenOn: DateOnly;
     /** Greater than 0. */
     amount: number;
@@ -396,10 +398,10 @@ export interface SalaryBreakdown {
 }
 /** A payslip: a snapshot, so a paid month stays what was paid. */
 export interface SalaryPayment {
-    /** Server-issued id. */
-    id: number;
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     /** Inclusive; the first of the month. */
     periodStart: DateOnly;
     /** Exclusive. */
@@ -442,16 +444,16 @@ export interface PayrollRow {
 }
 /** Mark a month paid. The server computes the snapshot; it takes no figures from the client. */
 export interface PayslipInput {
-    /** Server-issued id. */
-    staffId: number;
+    /** Server-issued id: a lower-case UUID. */
+    staffId: Id;
     month: Month;
     /** Rupees, two decimals. */
     otherDeductions?: number;
     note?: string | null;
 }
 export interface BonusSlab {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     /** Inclusive. */
     fromStitches: number;
     /** Exclusive; null for the open top band. */
@@ -460,8 +462,8 @@ export interface BonusSlab {
     value: number;
 }
 export interface BonusRule {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     name: string;
     isActive: boolean;
     condition: BonusCondition;
@@ -511,8 +513,8 @@ export interface ShiftPatch {
     sortOrder?: number;
 }
 export interface ShiftTiming {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     startMinute: number;
     durationMinutes: number;
 }
@@ -521,8 +523,8 @@ export interface TimingsInput {
     shifts: ShiftTiming[];
 }
 export interface ShiftSnapshot {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     name: string;
     startMinute: number;
     durationMinutes: number;
@@ -550,8 +552,8 @@ export interface SlabProblem {
 /** The facts, not sentences: the client words them in its language. */
 export interface DeletedItem {
     kind: DeletedKind;
-    /** For attendance, the lowest id of the cleared month. */
-    id: number;
+    /** For attendance, the first mark of the cleared month. */
+    id: Id;
     deletedAt: Instant;
     expiresAt: Instant;
     /** What the unit called it; never translated. */
@@ -578,8 +580,8 @@ export interface CreateUserInput {
     role: UserRole;
     /** Selected modules. Each within the creator's own level and the role's ceiling. */
     modules?: Partial<Record<ModuleKey, AccessLevel>>;
-    /** Server-issued id. */
-    staffId?: number | null;
+    /** Server-issued id: a lower-case UUID. */
+    staffId?: Id | null;
 }
 export interface CreatedUser {
     member: Member;
@@ -593,8 +595,8 @@ export interface TemporaryPassword {
     temporaryPassword: string;
 }
 export interface TransferOwnershipInput {
-    /** Server-issued id. */
-    toMemberId: number;
+    /** Server-issued id: a lower-case UUID. */
+    toMemberId: Id;
 }
 export interface LoginInput {
     /** Phone (E.164), email or username. */
@@ -621,8 +623,8 @@ export interface TokenPair {
     expiresIn: number;
 }
 export interface SelectPropertyInput {
-    /** Server-issued id. */
-    memberId: number;
+    /** Server-issued id: a lower-case UUID. */
+    memberId: Id;
 }
 export interface RefreshInput {
     refreshToken: string;
@@ -714,8 +716,8 @@ export interface NextCode {
     code: string;
 }
 export interface CreatedId {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
 }
 export interface FileRef {
     id: string;
@@ -726,15 +728,15 @@ export interface FileRef {
     height: number | null;
 }
 export interface AuditEntry {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     occurredAt: Instant;
-    /** Server-issued id. */
-    propertyId: number | null;
-    /** Server-issued id. */
-    actorUserId: number | null;
-    /** Server-issued id. */
-    actorMemberId: number | null;
+    /** Server-issued id: a lower-case UUID. */
+    propertyId: Id | null;
+    /** Server-issued id: a lower-case UUID. */
+    actorUserId: Id | null;
+    /** Server-issued id: a lower-case UUID. */
+    actorMemberId: Id | null;
     actorPlatformRole: PlatformRole | null;
     action: string;
     entityType: string;
@@ -806,8 +808,8 @@ export interface PropertyPatch {
     machineLimit?: number;
 }
 export interface PropertySummary {
-    /** Server-issued id. */
-    id: number;
+    /** Server-issued id: a lower-case UUID. */
+    id: Id;
     code: string;
     name: string;
     status: PropertyStatus;
@@ -829,8 +831,8 @@ export interface PlatformUser {
     liveSessions: number;
 }
 export interface PlatformStaffMember {
-    /** Server-issued id. */
-    userId: number;
+    /** Server-issued id: a lower-case UUID. */
+    userId: Id;
     displayName: string;
     email: string | null;
     role: PlatformRole;

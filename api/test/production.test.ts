@@ -1,21 +1,22 @@
 import assert from 'node:assert/strict';
+import { isId } from '@stitchflow/contract';
 import { after, before, describe, it } from 'node:test';
 import { seedProperty, signInAll, startHarness, type Client, type Harness, type SeededProperty } from './helpers.ts';
 
 let h: Harness;
 let p: SeededProperty;
 let as: Record<string, Client>;
-let day: number;
-let night: number;
+let day: string;
+let night: string;
 const m: Record<number, number> = {};
-let ravi: number;
-let sita: number;
-let mohan: number;
-let designer: number;
+let ravi: string;
+let sita: string;
+let mohan: string;
+let designer: string;
 
 const insertStaff = async (name: string, category = 'karigar') =>
   (await h.sql(`insert into staff (property_id, name, category, monthly_salary) values ($1, $2, $3, 15000) returning id`,
-    [p.propertyId, name, category]))[0].id as number;
+    [p.propertyId, name, category]))[0].id as string;
 
 const draft = (over: Record<string, unknown> = {}) => ({
   machineId: m[1], workDate: '2026-09-10', shiftId: day, totalStitches: 180000, embMinutes: 600,
@@ -288,7 +289,7 @@ describe('report scans', () => {
       reading: { totalStitches: { value: 12000, confidence: 0.9, source: 'STITCH 12000' } },
     });
     assert.equal(scan.status, 200);
-    assert.equal(typeof scan.body.id, 'number');
+    assert.ok(isId(scan.body.id), `a UUID id, got ${scan.body.id}`);
     const saved = await as.worker.put('/v1/production/entry', draft({ workDate: '2026-09-21', scanId: scan.body.id }));
     assert.equal(saved.status, 200);
     const [row] = await h.sql(`select entry_id, lines, reading from slip_scans where id = $1`, [scan.body.id]);

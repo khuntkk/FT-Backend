@@ -13,7 +13,7 @@
 -- restoring a payslip puts the balance right by itself. Null bounds mean
 -- "now, after every payslip".
 create or replace function fn_advance_outstanding(
-  p_staff_id bigint,
+  p_staff_id uuid,
   p_period_start date default null,
   p_period_end date default null
 ) returns numeric(12,2)
@@ -46,16 +46,16 @@ $$;
 --   advance_given       handed out during the month
 --   payment_id          the month's live payslip, if there is one — a paid
 --                       month is shown from it, never recomputed
-create or replace function fn_payroll_inputs(p_property_id bigint, p_month date)
+create or replace function fn_payroll_inputs(p_property_id uuid, p_month date)
 returns table (
-  staff_id             bigint,
+  staff_id             uuid,
   days_worked          numeric(5,1),
   every_day_present    boolean,
   bonus_earned         numeric(12,2),
   stitches             bigint,
   advance_outstanding  numeric(12,2),
   advance_given        numeric(12,2),
-  payment_id           bigint
+  payment_id           uuid
 )
 language sql stable as $$
   with bounds as not materialized (

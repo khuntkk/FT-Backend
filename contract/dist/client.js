@@ -4,7 +4,7 @@
 //
 //   const api = createClient({ baseUrl, getAccessToken: () => token });
 //   const machines = await api.call('GET /v1/machines', { query: { activeOnly: true } });
-//   await api.call('DELETE /v1/machines/:id', { params: { id: 3 } });
+//   await api.call('DELETE /v1/machines/:id', { params: { id: machine.id } });
 import { ROUTES } from './generated/routes.js';
 /** An error response, with the contract's code. */
 export class ApiRequestError extends Error {

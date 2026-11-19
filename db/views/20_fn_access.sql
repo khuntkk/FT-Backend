@@ -13,7 +13,7 @@ $$;
 -- A member's level on a module: their own grant if they have one, else
 -- their role's default — never above the role's ceiling. The owner is never
 -- restricted.
-create or replace function fn_member_level(p_member_id bigint, p_module text)
+create or replace function fn_member_level(p_member_id uuid, p_module text)
 returns text
 language sql stable as $$
   select case
@@ -52,13 +52,13 @@ join role_module_defaults d on d.role = m.role and d.module = mo.key
 left join member_module_access g on g.member_id = m.id and g.module = mo.key
 where m.status = 'active';
 
--- Whether a member may perform an action, e.g. fn_member_can(7, 'machines.delete').
+-- Whether a member may perform an action, e.g. fn_member_can(<member id>, 'machines.delete').
 --
 --   * The member, their login and their property must all be active.
 --   * An owner-only action needs the owner.
 --   * A destructive action needs a super admin — whatever the module level.
 --   * Anything else needs the action's level on its module.
-create or replace function fn_member_can(p_member_id bigint, p_action text)
+create or replace function fn_member_can(p_member_id uuid, p_action text)
 returns boolean
 language sql stable as $$
   select coalesce((
@@ -78,7 +78,7 @@ $$;
 
 -- Whether a member may create — and so manage — a member of p_role.
 -- Only the owner makes super admins.
-create or replace function fn_member_can_create(p_member_id bigint, p_role text)
+create or replace function fn_member_can_create(p_member_id uuid, p_role text)
 returns boolean
 language sql stable as $$
   select coalesce((
@@ -97,7 +97,7 @@ $$;
 -- within the grantee's role ceiling. Sub users get selected modules, never
 -- more than the person who selected them.
 create or replace function fn_can_grant(
-  p_granter_member_id bigint,
+  p_granter_member_id uuid,
   p_grantee_role text,
   p_module text,
   p_level text
@@ -114,10 +114,10 @@ $$;
 -- Security definer because it runs before a property is chosen, when
 -- row-level security would hide every membership. It returns only the
 -- caller-named user's own memberships and nothing else.
-create or replace function fn_user_memberships(p_user_id bigint)
+create or replace function fn_user_memberships(p_user_id uuid)
 returns table (
-  member_id      bigint,
-  property_id    bigint,
+  member_id      uuid,
+  property_id    uuid,
   property_code  text,
   property_name  text,
   property_status text,
@@ -135,5 +135,5 @@ $$;
 
 -- It runs as its owner and takes any user id, so only the API's own roles
 -- may call it: not PUBLIC, which on Supabase includes the anonymous REST role.
-revoke execute on function fn_user_memberships(bigint) from public;
-grant execute on function fn_user_memberships(bigint) to stitchflow_api, stitchflow_platform;
+revoke execute on function fn_user_memberships(uuid) from public;
+grant execute on function fn_user_memberships(uuid) to stitchflow_api, stitchflow_platform;

@@ -5,6 +5,8 @@
 // it. A request for a property also sets app.property_id; without it the
 // API role sees no tenant rows at all — it fails closed (0004_security.sql).
 
+import { isId } from '@stitchflow/contract';
+import type { Id } from '@stitchflow/contract';
 import pg from 'pg';
 import { pgOptions } from '../config.ts';
 
@@ -41,7 +43,7 @@ export interface Tx {
 
 export interface Db {
   /** As the apps' API role, for one property — or for none, before one is chosen. */
-  api<T>(propertyId: number | null, fn: (tx: Tx) => Promise<T>): Promise<T>;
+  api<T>(propertyId: Id | null, fn: (tx: Tx) => Promise<T>): Promise<T>;
   /** As the web admin panel's role, which sees every property. */
   platform<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
   close(): Promise<void>;
@@ -74,7 +76,7 @@ export interface Connection {
 async function inTransaction<T>(
   acquire: () => Promise<Connection>,
   role: 'stitchflow_api' | 'stitchflow_platform',
-  propertyId: number | null,
+  propertyId: Id | null,
   fn: (tx: Tx) => Promise<T>,
 ): Promise<T> {
   const client = await acquire();
@@ -91,9 +93,9 @@ async function inTransaction<T>(
     // ONE parameterless round trip opens the transaction and sets time zone,
     // role, property and the server-side limits (the API can be far from the
     // database). Role is one of two literals and the property id a validated
-    // integer, so escaping them is safe. No property is '', which
+    // UUID, so escaping them is safe. No property is '', which
     // fn_current_property() reads as null, the same as never set.
-    if (propertyId !== null && !Number.isSafeInteger(propertyId)) throw new Error('propertyId must be an integer.');
+    if (propertyId !== null && !isId(propertyId)) throw new Error('propertyId must be a lower-case UUID.');
     await client.query(
       `begin; select set_config('TimeZone', 'UTC', true), set_config('role', ${pg.escapeLiteral(role)}, true),
               set_config('app.property_id', ${pg.escapeLiteral(propertyId === null ? '' : String(propertyId))}, true),

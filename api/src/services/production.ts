@@ -2,11 +2,8 @@
 // Production). One slip per machine, date and shift; the server works out
 // the bonus on save, so what the app sent is only ever a preview.
 
-import { addDays, monthRange, roundMoney } from '@stitchflow/contract';
-import type {
-  CreatedId, DateOnly, EntryDraft, EntryPage, EntryWithKarigars, MachineDay, Month, ProductionEntry,
-  ProductionTotals, ScanInput,
-} from '@stitchflow/contract';
+import { addDays, isId, monthRange, roundMoney } from '@stitchflow/contract';
+import type { CreatedId, DateOnly, EntryDraft, EntryPage, EntryWithKarigars, Id, MachineDay, Month, ProductionEntry, ProductionTotals, ScanInput } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { invalid, notFound } from '../http/errors.ts';
 import type { Member } from '../http/types.ts';
@@ -44,13 +41,13 @@ type EntryRow = ProductionEntry & Omit<EntryWithKarigars, 'entry'>;
 const shape = ({ karigars, bonusPerKarigar, ...entry }: EntryRow): EntryWithKarigars =>
   ({ entry, karigars, bonusPerKarigar });
 
-async function getById(tx: Tx, id: number, pay: boolean): Promise<EntryWithKarigars> {
+async function getById(tx: Tx, id: Id, pay: boolean): Promise<EntryWithKarigars> {
   const row = await tx.one<EntryRow>(`${entrySelect(pay)} where e.id = $1 and e.deleted_at is null`, [id]);
   if (!row) throw notFound('No such slip.');
   return shape(row);
 }
 
-export async function find(tx: Tx, pay: boolean, machineId: number, date: DateOnly, shiftId: number): Promise<EntryWithKarigars> {
+export async function find(tx: Tx, pay: boolean, machineId: Id, date: DateOnly, shiftId: Id): Promise<EntryWithKarigars> {
   const row = await tx.one<EntryRow>(
     `${entrySelect(pay)}
      where e.machine_id = $1 and e.work_date = $2 and e.shift_id = $3 and e.deleted_at is null`,
@@ -61,7 +58,7 @@ export async function find(tx: Tx, pay: boolean, machineId: number, date: DateOn
 }
 
 /** Every live, active machine by number, with its slip for the date and shift or null. */
-export async function day(tx: Tx, pay: boolean, date: DateOnly, shiftId: number): Promise<MachineDay[]> {
+export async function day(tx: Tx, pay: boolean, date: DateOnly, shiftId: Id): Promise<MachineDay[]> {
   const live = await machines.list(tx, true);
   const rows = await tx.rows<EntryRow>(
     `${entrySelect(pay)} where e.work_date = $1 and e.shift_id = $2 and e.deleted_at is null`, [date, shiftId]);
@@ -88,8 +85,8 @@ async function checkDraft(tx: Tx, draft: EntryDraft): Promise<void> {
   if (draft.scanId != null && !facts!.scanFits) fields.scanId = 'notFound';
 
   const ids = draft.karigars.map((k) => k.staffId);
-  const karigars = await tx.rows<{ id: number }>(
-    `select s.id from staff s where s.id = any($1::bigint[]) and s.deleted_at is null and s.category = 'karigar'`,
+  const karigars = await tx.rows<{ id: Id }>(
+    `select s.id from staff s where s.id = any($1::uuid[]) and s.deleted_at is null and s.category = 'karigar'`,
     [ids],
   );
   const ok = new Set(karigars.map((s) => s.id));
@@ -148,7 +145,7 @@ export async function save(tx: Tx, member: Member, given: EntryDraft): Promise<E
   await checkDraft(tx, given);
   const draft = await withPermittedBonus(tx, member, given);
   const bonus = await bonusFor(tx, member, draft);
-  const row = await tx.one<{ id: number }>(
+  const row = await tx.one<{ id: Id }>(
     `insert into production_entries (property_id, ${SAVED.join(', ')}, created_by_member_id, updated_by_member_id)
      values ($1, ${SAVED.map((_, i) => `$${i + 2}`).join(', ')}, $19, $19)
      on conflict (machine_id, work_date, shift_id) do update set
@@ -167,7 +164,7 @@ export async function save(tx: Tx, member: Member, given: EntryDraft): Promise<E
   await tx.exec(`delete from entry_karigars where entry_id = $1`, [id]);
   await tx.exec(
     `insert into entry_karigars (property_id, entry_id, staff_id, is_half_day)
-     select $1, $2, s, h from unnest($3::bigint[], $4::boolean[]) as k(s, h)`,
+     select $1, $2, s, h from unnest($3::uuid[], $4::boolean[]) as k(s, h)`,
     [member.propertyId, id, draft.karigars.map((k) => k.staffId), draft.karigars.map((k) => k.isHalfDay)],
   );
   if (draft.scanId != null) await tx.exec(`update slip_scans set entry_id = $1 where id = $2`, [id, draft.scanId]);
@@ -175,7 +172,7 @@ export async function save(tx: Tx, member: Member, given: EntryDraft): Promise<E
 }
 
 /** Soft delete. Returns the slip as it was. */
-export async function remove(tx: Tx, member: Member, id: number): Promise<EntryWithKarigars> {
+export async function remove(tx: Tx, member: Member, id: Id): Promise<EntryWithKarigars> {
   const before = await getById(tx, id, true);
   await tx.exec(
     `update production_entries set deleted_at = now(), deleted_by_member_id = $2, deleted_batch = gen_random_uuid()
@@ -188,19 +185,19 @@ export async function remove(tx: Tx, member: Member, id: number): Promise<EntryW
 export interface EntryQuery {
   from: DateOnly;
   to: DateOnly;
-  shiftId?: number;
-  staffId?: number;
+  shiftId?: Id;
+  staffId?: Id;
   limit?: number;
   cursor?: string;
 }
 
 // The cursor is the last row's sort key, opaque to the client.
-const encodeCursor = (date: DateOnly, id: number) => Buffer.from(JSON.stringify([date, id])).toString('base64url');
+const encodeCursor = (date: DateOnly, id: Id) => Buffer.from(JSON.stringify([date, id])).toString('base64url');
 
-function decodeCursor(cursor: string): [DateOnly, number] {
+function decodeCursor(cursor: string): [DateOnly, Id] {
   try {
     const [date, id] = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isSafeInteger(id)) return [date, id];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && isId(id)) return [date, id];
   } catch { /* falls through */ }
   throw invalid({ cursor: 'invalid' }, 'Bad cursor.');
 }
@@ -213,9 +210,9 @@ export async function page(tx: Tx, pay: boolean, q: EntryQuery): Promise<EntryPa
   const rows = await tx.rows<EntryRow>(
     `${entrySelect(pay)}
      where e.deleted_at is null and e.work_date between $1 and $2
-       and ($3::bigint is null or e.shift_id = $3)
-       and ($4::bigint is null or exists (select 1 from entry_karigars x where x.entry_id = e.id and x.staff_id = $4))
-       and ($5::date is null or (e.work_date, e.id) < ($5::date, $6::bigint))
+       and ($3::uuid is null or e.shift_id = $3)
+       and ($4::uuid is null or exists (select 1 from entry_karigars x where x.entry_id = e.id and x.staff_id = $4))
+       and ($5::date is null or (e.work_date, e.id) < ($5::date, $6::uuid))
      order by e.work_date desc, e.id desc
      limit $7`,
     [q.from, q.to, q.shiftId ?? null, q.staffId ?? null, afterDate, afterId, limit + 1],
@@ -245,7 +242,7 @@ const totalsSql = (byDay: boolean) => `
     from production_entries e
     join shifts sh on sh.id = e.shift_id
     where e.deleted_at is null and e.work_date >= $1 and e.work_date < $2
-      and ($3::bigint is null or e.shift_id = $3)
+      and ($3::uuid is null or e.shift_id = $3)
     ${byDay ? 'group by e.work_date' : ''}
   )
   select ${byDay ? 'day,' : ''} stitches, emb as "embMinutes", stop as "stopMinutes", breaks as "threadBreaks",
@@ -256,13 +253,13 @@ const totalsSql = (byDay: boolean) => `
   from sums`;
 
 /** Totals from `from` to `to` inclusive. */
-export async function totals(tx: Tx, from: DateOnly, to: DateOnly, shiftId?: number): Promise<ProductionTotals> {
+export async function totals(tx: Tx, from: DateOnly, to: DateOnly, shiftId?: Id): Promise<ProductionTotals> {
   const row = await tx.one<ProductionTotals>(totalsSql(false), [from, addDays(to, 1), shiftId ?? null]);
   return row!;
 }
 
 /** A month's totals per day; days with nothing recorded are absent. */
-export async function dailyTotals(tx: Tx, month: Month, shiftId?: number): Promise<Record<DateOnly, ProductionTotals>> {
+export async function dailyTotals(tx: Tx, month: Month, shiftId?: Id): Promise<Record<DateOnly, ProductionTotals>> {
   const { start, end } = monthRange(month);
   const rows = await tx.rows<ProductionTotals & { day: DateOnly }>(totalsSql(true), [start, end, shiftId ?? null]);
   return Object.fromEntries(rows.map(({ day: d, ...t }) => [d, t]));

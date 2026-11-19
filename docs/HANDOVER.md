@@ -236,11 +236,16 @@ use it, so keep those routes stable.
 
 ## 7. Where things stand (7 October 2026)
 
-**Built:** all 105 routes of contract 1.5.0 have handlers (3 public, 7
+**Built:** all 105 routes of contract 2.0.0 have handlers (3 public, 7
 session, 72 member, 23 platform). 1.5.0 (18 November 2026) added editing a
 property's code, a user's name and sign-in identifiers, a console user's
-name, email and role, and one's own name. `db/check` passes 100 rules. About 315 API
-tests and 19 contract tests, none needing a database or network. CI
+name, email and role, and one's own name. 2.0.0 (19 November 2026) made every
+id a lower-case, time-ordered UUID (version 7) instead of a number: migration
+0010 converts an existing database in place (links, order, policies kept;
+every session ended), and db/check/check-uuid-migration.mjs proves it on
+linked data. `db/check` passes 107 rules plus 63 for the conversion; 345 API
+tests and 19 contract tests, none needing a database or network. Migrations
+and views now apply in one transaction (api/src/db/migrate.ts). CI
 (`.github/workflows/ci.yml`) runs db/check, contract tests, typecheck and API
 tests on pushes to main/dev.
 

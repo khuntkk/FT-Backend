@@ -3,20 +3,21 @@
 // library.
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { ClientKind, PlatformRole, UserRole } from '@stitchflow/contract';
+import { isId } from '@stitchflow/contract';
+import type { ClientKind, Id, PlatformRole, UserRole } from '@stitchflow/contract';
 import { ApiError } from '../http/errors.ts';
 
 export const ACCESS_TOKEN_SECONDS = 15 * 60;
 
 export interface AccessClaims {
   /** User id. */
-  sub: number;
+  sub: Id;
   /** Session id (auth_sessions.id). */
   sid: string;
   client: ClientKind;
   /** Member and property the token acts in; null until a property is chosen. */
-  mid: number | null;
-  pid: number | null;
+  mid: Id | null;
+  pid: Id | null;
   role: UserRole | null;
   /** Platform staff role, on web admin panel tokens only. */
   prole?: PlatformRole;
@@ -34,12 +35,12 @@ export function signAccessToken(claims: AccessClaims, secret: string, now = Date
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLIENTS = ['managerApp', 'crewApp', 'webAdmin'];
-const intOrNull = (v: unknown) => v === null || Number.isSafeInteger(v);
+const idOrNull = (v: unknown) => v === null || isId(v);
 
 function validShape(c: any): boolean {
-  return typeof c === 'object' && c !== null && Number.isSafeInteger(c.sub) &&
+  return typeof c === 'object' && c !== null && isId(c.sub) &&
     typeof c.sid === 'string' && UUID.test(c.sid) && CLIENTS.includes(c.client) &&
-    intOrNull(c.mid) && intOrNull(c.pid);
+    idOrNull(c.mid) && idOrNull(c.pid);
 }
 
 /** The claims of a valid token; 401 unauthenticated or token_expired otherwise. */

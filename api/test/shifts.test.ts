@@ -24,9 +24,9 @@ const PAST = '2026-03-10';
 interface Unit {
   p: SeededProperty;
   as: Client;
-  dayShift: number;
-  nightShift: number;
-  machineId: number;
+  dayShift: string;
+  nightShift: string;
+  machineId: string;
 }
 
 /** A fresh property with its seeded Day and Night, one machine, and its super admin signed in. */
@@ -40,19 +40,19 @@ async function fresh(): Promise<Unit> {
 }
 
 /** Records a slip; `deleted` puts it straight into the bin. */
-async function slip(u: Unit, shiftId: number, workDate: string, opts: { deleted?: boolean; stitches?: number } = {}) {
+async function slip(u: Unit, shiftId: string, workDate: string, opts: { deleted?: boolean; stitches?: number } = {}) {
   const [{ id }] = await h.sql(
     `insert into production_entries (property_id, machine_id, work_date, shift_id, total_stitches, deleted_at)
      values ($1, $2, $3, $4, $5, $6) returning id`,
     [u.p.propertyId, u.machineId, workDate, shiftId, opts.stitches ?? 100000, opts.deleted ? new Date() : null],
   );
-  return id as number;
+  return id as string;
 }
 
 const rowCount = async (u: Unit) =>
   Number((await h.sql(`select count(*) as n from shifts where property_id = $1`, [u.p.propertyId]))[0].n);
-const slipShift = async (id: number) =>
-  Number((await h.sql(`select shift_id from production_entries where id = $1`, [id]))[0].shift_id);
+const slipShift = async (id: string) =>
+  (await h.sql(`select shift_id from production_entries where id = $1`, [id]))[0].shift_id;
 const current = async (u: Unit) => (await u.as.get('/v1/shifts/current')).body as any[];
 const editable = async (u: Unit) => (await u.as.get('/v1/shifts/editable')).body as any[];
 const names = (xs: any[]) => xs.map((s) => s.name);

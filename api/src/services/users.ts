@@ -9,7 +9,7 @@
 // users has no row-level security (a user is global), so a user row is only
 // ever reached through a property_members row, which has it.
 
-import type { AccessLevel, CreateUserInput, CreatedUser, Member, ModuleKey, UserRole } from '@stitchflow/contract';
+import type { AccessLevel, CreatedUser, CreateUserInput, Id, Member, ModuleKey, UserRole } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { hashPassword, temporaryPassword } from '../auth/passwords.ts';
 import { ApiError, invalid, notFound } from '../http/errors.ts';
@@ -29,7 +29,7 @@ export function list(tx: Tx): Promise<Member[]> {
   );
 }
 
-export async function get(tx: Tx, memberId: number): Promise<Member> {
+export async function get(tx: Tx, memberId: Id): Promise<Member> {
   const m = await getMember(tx, memberId);
   if (!m) throw notFound('No such user.');
   return m;
@@ -38,7 +38,7 @@ export async function get(tx: Tx, memberId: number): Promise<Member> {
 const cannot = (action: string, message: string) => new ApiError('forbidden', message, { action });
 
 /** The member, if the caller may manage them; 403 otherwise. */
-async function manageable(tx: Tx, caller: Caller, memberId: number, action: string): Promise<Member> {
+async function manageable(tx: Tx, caller: Caller, memberId: Id, action: string): Promise<Member> {
   const target = await get(tx, memberId);
   if (target.isOwner) throw cannot(action, 'The owner is changed only by handing the unit over.');
   const row = await tx.one<{ ok: boolean }>(`select fn_member_can_create($1, $2) as ok`, [caller.memberId, target.role]);
@@ -47,7 +47,7 @@ async function manageable(tx: Tx, caller: Caller, memberId: number, action: stri
 }
 
 /** 409 grant_exceeds_granter for the first module above the granter's level or the role's ceiling. */
-async function checkGrants(tx: Tx, granter: number, role: UserRole, modules: Modules) {
+async function checkGrants(tx: Tx, granter: Id, role: UserRole, modules: Modules) {
   const over = await tx.one<{ module: string; level: string }>(
     `select g.key as module, g.value as level from jsonb_each_text($3::jsonb) g
      where not coalesce(fn_can_grant($1, $2, g.key, g.value), false)
@@ -59,7 +59,7 @@ async function checkGrants(tx: Tx, granter: number, role: UserRole, modules: Mod
   }
 }
 
-async function saveGrants(tx: Tx, memberId: number, granter: number, modules: Modules) {
+async function saveGrants(tx: Tx, memberId: Id, granter: Id, modules: Modules) {
   await tx.exec(
     `insert into member_module_access (member_id, module, level, granted_by_member_id)
      select $1, g.key, g.value, $2 from jsonb_each_text($3::jsonb) g
@@ -85,7 +85,7 @@ export async function create(tx: Tx, caller: Caller, input: CreateUserInput): Pr
   const user = await findOrCreateUser(tx, input, caller.propertyId);
   const already = await tx.one(`select 1 from property_members where user_id = $1`, [user.userId]);
   if (already) throw invalid({ [user.matchedOn]: 'alreadyMember' }, 'That person already has a login here.');
-  const row = await tx.one<{ id: number }>(
+  const row = await tx.one<{ id: Id }>(
     `insert into property_members (property_id, user_id, role, staff_id, created_by_member_id)
      values ($1, $2, $3, $4, $5) returning id`,
     [caller.propertyId, user.userId, input.role, input.staffId ?? null, caller.memberId],
@@ -109,11 +109,11 @@ const USER_CHECKS: Record<string, string> = {
  * platform's owner creation does), or anyone who can add users could take
  * over a login from another unit.
  */
-async function findOrCreateUser(tx: Tx, input: CreateUserInput, propertyId: number) {
+async function findOrCreateUser(tx: Tx, input: CreateUserInput, propertyId: Id) {
   const given = IDENTIFIERS.filter((k) => input[k] != null && String(input[k]).trim() !== '');
   if (!given.length) throw invalid({ phone: 'required' }, 'Give a phone, email or username.');
   const value = (k: (typeof IDENTIFIERS)[number]) => (given.includes(k) ? String(input[k]).trim() : null);
-  const found = await tx.rows<{ id: number; hasPassword: boolean; matchedOn: string }>(
+  const found = await tx.rows<{ id: Id; hasPassword: boolean; matchedOn: string }>(
     `select id, password_hash is not null as "hasPassword",
             case when phone = $1 then 'phone' when email = $2 then 'email' else 'username' end as "matchedOn"
      from users where phone = $1 or email = $2 or username = $3`,
@@ -138,9 +138,9 @@ async function findOrCreateUser(tx: Tx, input: CreateUserInput, propertyId: numb
 }
 
 async function insertUser(tx: Tx, displayName: string, value: (k: 'phone' | 'email' | 'username') => string | null,
-  hash: string): Promise<number> {
+  hash: string): Promise<Id> {
   try {
-    const row = await tx.one<{ id: number }>(
+    const row = await tx.one<{ id: Id }>(
       `insert into users (display_name, phone, email, username, password_hash, must_change_password)
        values ($1, $2, $3, $4, $5, true) returning id`,
       [displayName, value('phone'), value('email'), value('username'), hash],
@@ -153,11 +153,11 @@ async function insertUser(tx: Tx, displayName: string, value: (k: 'phone' | 'ema
   }
 }
 
-const isPlatformStaff = async (tx: Tx, userId: number) =>
+const isPlatformStaff = async (tx: Tx, userId: Id) =>
   !!(await tx.one(`select 1 from platform_staff where user_id = $1`, [userId]));
 
 /** How many other units the user belongs to (fn_user_memberships sees past row-level security). */
-async function otherUnits(tx: Tx, userId: number, propertyId: number): Promise<number> {
+async function otherUnits(tx: Tx, userId: Id, propertyId: Id): Promise<number> {
   const r = await tx.one<{ n: number }>(
     `select count(*)::int as n from fn_user_memberships($1) where property_id <> $2`, [userId, propertyId]);
   return r!.n;
@@ -169,7 +169,7 @@ async function otherUnits(tx: Tx, userId: number, propertyId: number): Promise<n
  * could add another unit's owner (or our own staff) by phone and reset their
  * password. Shared logins are reset by StitchFlow support.
  */
-async function assertOwnLogin(tx: Tx, userId: number, propertyId: number): Promise<void> {
+async function assertOwnLogin(tx: Tx, userId: Id, propertyId: Id): Promise<void> {
   if (await isPlatformStaff(tx, userId) || (await otherUnits(tx, userId, propertyId)) > 0) {
     throw new ApiError('forbidden', 'This sign-in is also used elsewhere; StitchFlow support can reset it.', {
       reason: 'sharedLogin',
@@ -177,7 +177,7 @@ async function assertOwnLogin(tx: Tx, userId: number, propertyId: number): Promi
   }
 }
 
-async function issueTemporaryPassword(tx: Tx, userId: number): Promise<string> {
+async function issueTemporaryPassword(tx: Tx, userId: Id): Promise<string> {
   const password = temporaryPassword();
   await tx.exec(`update users set password_hash = $2, must_change_password = true where id = $1`,
     [userId, await hashPassword(password)]);
@@ -189,7 +189,7 @@ async function issueTemporaryPassword(tx: Tx, userId: number): Promise<string> {
 // ---------------------------------------------------------------------------
 
 /** Changes the given modules, within the caller's own levels and the member's ceiling. Returns [before, after]. */
-export async function updateAccess(tx: Tx, caller: Caller, memberId: number, modules: Modules) {
+export async function updateAccess(tx: Tx, caller: Caller, memberId: Id, modules: Modules) {
   const before = await manageable(tx, caller, memberId, 'users.update_access');
   await checkGrants(tx, caller.memberId, before.role, modules);
   await saveGrants(tx, memberId, caller.memberId, modules);
@@ -197,7 +197,7 @@ export async function updateAccess(tx: Tx, caller: Caller, memberId: number, mod
 }
 
 /** A temporary password, shown once. The old one stops working, so do its sessions. */
-export async function resetPassword(tx: Tx, caller: Caller, memberId: number): Promise<string> {
+export async function resetPassword(tx: Tx, caller: Caller, memberId: Id): Promise<string> {
   const target = await manageable(tx, caller, memberId, 'users.reset_password');
   await assertOwnLogin(tx, target.userId, caller.propertyId);
   const password = await issueTemporaryPassword(tx, target.userId);
@@ -206,7 +206,7 @@ export async function resetPassword(tx: Tx, caller: Caller, memberId: number): P
 }
 
 /** Switches a member's sign-in here off (ending their sessions here) or back on. Returns [before, after]. */
-export async function setStatus(tx: Tx, caller: Caller, memberId: number, status: 'active' | 'disabled') {
+export async function setStatus(tx: Tx, caller: Caller, memberId: Id, status: 'active' | 'disabled') {
   const before = await manageable(tx, caller, memberId, 'users.disable');
   await tx.exec(`update property_members set status = $2 where id = $1`, [memberId, status]);
   if (status === 'disabled') await revokeMemberSessions(tx, memberId, 'disabled');
@@ -218,7 +218,7 @@ export async function setStatus(tx: Tx, caller: Caller, memberId: number, status
  * actor_user_id; 0007 clears actor_member_id). References that only say who
  * created or granted something are cleared first. Returns the member as they were.
  */
-export async function remove(tx: Tx, caller: Caller, memberId: number): Promise<Member> {
+export async function remove(tx: Tx, caller: Caller, memberId: Id): Promise<Member> {
   const before = await manageable(tx, caller, memberId, 'users.remove');
   await revokeMemberSessions(tx, memberId, 'removed');
   await tx.exec(`update property_members set created_by_member_id = null where created_by_member_id = $1`, [memberId]);
@@ -237,7 +237,7 @@ export async function remove(tx: Tx, caller: Caller, memberId: number): Promise<
  * starts from the new role's defaults: grants chosen for the old role would
  * otherwise cap the new one. Returns [before, after].
  */
-export async function setSuperAdmin(tx: Tx, memberId: number, superAdmin: boolean) {
+export async function setSuperAdmin(tx: Tx, memberId: Id, superAdmin: boolean) {
   const before = await get(tx, memberId);
   if (before.isOwner) throw cannot('users.manage_super_admins', 'The owner stays a super admin; hand the unit over first.');
   const role: UserRole = superAdmin ? 'superAdmin' : 'admin';
@@ -249,7 +249,7 @@ export async function setSuperAdmin(tx: Tx, memberId: number, superAdmin: boolea
 }
 
 /** Hands the unit to another active super admin. The old owner stays a super admin. */
-export async function transferOwnership(tx: Tx, caller: Caller, toMemberId: number) {
+export async function transferOwnership(tx: Tx, caller: Caller, toMemberId: Id) {
   const target = await get(tx, toMemberId);
   if (target.id === caller.memberId) throw invalid({ toMemberId: 'self' }, 'You already own this unit.');
   if (target.role !== 'superAdmin') throw invalid({ toMemberId: 'notSuperAdmin' }, 'Make them a super admin first.');

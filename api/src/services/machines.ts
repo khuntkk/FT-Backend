@@ -2,9 +2,7 @@
 // (trigger machines_within_limit, 0005); a refusal arrives as constraint
 // `machine_limit` and errors.ts maps it to 409 machine_limit_reached.
 
-import type {
-  BulkCreated, Machine, MachineAllowance, MachineInput, MachinePatch,
-} from '@stitchflow/contract';
+import type { BulkCreated, Id, Machine, MachineAllowance, MachineInput, MachinePatch } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { ApiError, notFound, onConstraint } from '../http/errors.ts';
 import type { Member } from '../http/types.ts';
@@ -24,14 +22,14 @@ export function list(tx: Tx, activeOnly = false): Promise<Machine[]> {
   );
 }
 
-export async function get(tx: Tx, id: number): Promise<Machine> {
+export async function get(tx: Tx, id: Id): Promise<Machine> {
   const m = await tx.one<Machine>(
     `select ${MACHINE_COLUMNS} from machines m where m.id = $1 and m.deleted_at is null`, [id]);
   if (!m) throw notFound('No such machine.');
   return m;
 }
 
-export async function allowance(tx: Tx, propertyId: number): Promise<MachineAllowance> {
+export async function allowance(tx: Tx, propertyId: Id): Promise<MachineAllowance> {
   const a = await tx.one<MachineAllowance>(
     `select machine_limit as "limit", machines_used as used, machines_left as "left"
      from vw_machine_allowance where property_id = $1`,
@@ -44,7 +42,7 @@ const numberTaken = (number: number) => () =>
   new ApiError('machine_number_taken', `Machine ${number} already exists.`, { number });
 
 export async function create(tx: Tx, member: Member, input: MachineInput): Promise<Machine> {
-  const row = await onConstraint(tx.one<{ id: number }>(
+  const row = await onConstraint(tx.one<{ id: Id }>(
     `insert into machines (property_id, number, name, created_by_member_id, updated_by_member_id)
      values ($1, $2, $3, $4, $4) returning id`,
     [member.propertyId, input.number, input.name ?? null, member.memberId],
@@ -86,7 +84,7 @@ const PATCHABLE: Record<string, string> = {
   heads: 'heads', needles: 'needles', location: 'location', serialNo: 'serial_no',
 };
 
-export async function update(tx: Tx, member: Member, id: number, patch: MachinePatch): Promise<Machine> {
+export async function update(tx: Tx, member: Member, id: Id, patch: MachinePatch): Promise<Machine> {
   const sets: string[] = [];
   const values: unknown[] = [id, member.memberId];
   for (const [key, column] of Object.entries(PATCHABLE)) {
@@ -104,7 +102,7 @@ export async function update(tx: Tx, member: Member, id: number, patch: MachineP
 }
 
 /** Soft delete; the machine's live slips go into the bin in the same batch. Returns the machine as it was. */
-export async function remove(tx: Tx, member: Member, id: number): Promise<Machine> {
+export async function remove(tx: Tx, member: Member, id: Id): Promise<Machine> {
   const before = await get(tx, id);
   const batch = await tx.one<{ batch: string }>(
     `update machines set deleted_at = now(), deleted_by_member_id = $2, deleted_batch = gen_random_uuid()

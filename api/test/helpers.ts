@@ -22,6 +22,8 @@ import { hashPassword } from '../src/auth/passwords.ts';
 import { clearSignInLimits } from '../src/services/rateLimit.ts';
 
 export const PASSWORD = 'correct-horse-9';
+/** A well-formed id that names nothing: for "not found" checks. */
+export const NO_SUCH_ID = '00000000-0000-7000-8000-000000000000';
 
 export interface Harness {
   app: FastifyInstance;
@@ -142,10 +144,10 @@ export class Client {
 }
 
 export interface SeededProperty {
-  propertyId: number;
+  propertyId: string;
   code: string;
   /** memberId and username per role; the owner is the superAdmin. */
-  members: Record<UserRole | 'superAdmin2', { memberId: number; userId: number; username: string }>;
+  members: Record<UserRole | 'superAdmin2', { memberId: string; userId: string; username: string }>;
 }
 
 let seq = 0;

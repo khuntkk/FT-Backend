@@ -9,9 +9,9 @@ import {
   shiftEndMinute, shiftProblemMessage, smartAdjustNotes, validateShiftCycle, workingDayAt,
 } from '../src/domain/shifts.ts';
 
-function shift(name: string, o: { startHour: number; hours: number; order?: number; id?: number; extra?: number }) {
+function shift(name: string, o: { startHour: number; hours: number; order?: number; id?: string; extra?: number }) {
   return {
-    id: o.id ?? 1,
+    id: o.id ?? '1',
     name,
     startMinute: o.startHour * 60 + (o.extra ?? 0),
     durationMinutes: o.hours * 60,
@@ -49,8 +49,8 @@ describe('shift boundaries', () => {
 
 describe('shiftAtTime', () => {
   const cycle = [
-    shift('Day', { startHour: 8, hours: 12, id: 1, order: 0 }),
-    shift('Night', { startHour: 20, hours: 12, id: 2, order: 1 }),
+    shift('Day', { startHour: 8, hours: 12, id: '1', order: 0 }),
+    shift('Night', { startHour: 20, hours: 12, id: '2', order: 1 }),
   ];
 
   it('picks the shift running now', () => {
@@ -71,18 +71,18 @@ describe('shiftAtTime', () => {
 describe('orderedCycle', () => {
   it('runs from the first shift, not from midnight', () => {
     const shifts = [
-      shift('A', { startHour: 15, hours: 8, id: 1, order: 0 }),
-      shift('B', { startHour: 23, hours: 8, id: 2, order: 1 }),
-      shift('C', { startHour: 7, hours: 8, id: 3, order: 2 }),
+      shift('A', { startHour: 15, hours: 8, id: '1', order: 0 }),
+      shift('B', { startHour: 23, hours: 8, id: '2', order: 1 }),
+      shift('C', { startHour: 7, hours: 8, id: '3', order: 2 }),
     ];
     assert.deepEqual(names(orderedCycle(shifts)), ['A', 'B', 'C']);
   });
 
   it('sorts out-of-order rows by where they fall in the cycle', () => {
     const shifts = [
-      shift('C', { startHour: 7, hours: 8, id: 3, order: 2 }),
-      shift('A', { startHour: 15, hours: 8, id: 1, order: 0 }),
-      shift('B', { startHour: 23, hours: 8, id: 2, order: 1 }),
+      shift('C', { startHour: 7, hours: 8, id: '3', order: 2 }),
+      shift('A', { startHour: 15, hours: 8, id: '1', order: 0 }),
+      shift('B', { startHour: 23, hours: 8, id: '2', order: 1 }),
     ];
     assert.deepEqual(names(orderedCycle(shifts)), ['A', 'B', 'C']);
   });
@@ -93,9 +93,9 @@ describe('orderedCycle', () => {
 
   it('the anchor can be any time, not a round hour', () => {
     const shifts = [
-      shift('A', { startHour: 6, extra: 45, hours: 7, id: 1, order: 0 }),
-      shift('B', { startHour: 13, extra: 45, hours: 7, id: 2, order: 1 }),
-      shift('C', { startHour: 20, extra: 45, hours: 7, id: 3, order: 2 }),
+      shift('A', { startHour: 6, extra: 45, hours: 7, id: '1', order: 0 }),
+      shift('B', { startHour: 13, extra: 45, hours: 7, id: '2', order: 1 }),
+      shift('C', { startHour: 20, extra: 45, hours: 7, id: '3', order: 2 }),
     ];
     assert.deepEqual(names(orderedCycle(shifts)), ['A', 'B', 'C']);
     assert.deepEqual(validateShiftCycle(shifts), []);
@@ -104,8 +104,8 @@ describe('orderedCycle', () => {
 
   it('a cycle can start one minute past midnight', () => {
     const shifts = [
-      shift('Early', { startHour: 0, extra: 1, hours: 12, id: 1, order: 0 }),
-      shift('Late', { startHour: 12, extra: 1, hours: 12, id: 2, order: 1 }),
+      shift('Early', { startHour: 0, extra: 1, hours: 12, id: '1', order: 0 }),
+      shift('Late', { startHour: 12, extra: 1, hours: 12, id: '2', order: 1 }),
     ];
     assert.deepEqual(validateShiftCycle(shifts), []);
   });
@@ -114,31 +114,31 @@ describe('orderedCycle', () => {
 describe('validateShiftCycle', () => {
   it('day and night are sound', () => {
     assert.deepEqual(validateShiftCycle([
-      shift('Day', { startHour: 8, hours: 12, id: 1, order: 0 }),
-      shift('Night', { startHour: 20, hours: 12, id: 2, order: 1 }),
+      shift('Day', { startHour: 8, hours: 12, id: '1', order: 0 }),
+      shift('Night', { startHour: 20, hours: 12, id: '2', order: 1 }),
     ]), []);
   });
 
   it('three eight-hour shifts are sound', () => {
     assert.deepEqual(validateShiftCycle([
-      shift('Morning', { startHour: 8, hours: 8, id: 1, order: 0 }),
-      shift('Evening', { startHour: 16, hours: 8, id: 2, order: 1 }),
-      shift('Night', { startHour: 0, hours: 8, id: 3, order: 2 }),
+      shift('Morning', { startHour: 8, hours: 8, id: '1', order: 0 }),
+      shift('Evening', { startHour: 16, hours: 8, id: '2', order: 1 }),
+      shift('Night', { startHour: 0, hours: 8, id: '3', order: 2 }),
     ]), []);
   });
 
   it('a cycle anchored at 3pm is sound', () => {
     assert.deepEqual(validateShiftCycle([
-      shift('First', { startHour: 15, hours: 8, id: 1, order: 0 }),
-      shift('Second', { startHour: 23, hours: 8, id: 2, order: 1 }),
-      shift('Third', { startHour: 7, hours: 8, id: 3, order: 2 }),
+      shift('First', { startHour: 15, hours: 8, id: '1', order: 0 }),
+      shift('Second', { startHour: 23, hours: 8, id: '2', order: 1 }),
+      shift('Third', { startHour: 7, hours: 8, id: '3', order: 2 }),
     ]), []);
   });
 
   it('overlapping shifts are rejected', () => {
     const problems = validateShiftCycle([
-      shift('Day', { startHour: 8, hours: 12, id: 1, order: 0 }),
-      shift('Night', { startHour: 18, hours: 12, id: 2, order: 1 }),
+      shift('Day', { startHour: 8, hours: 12, id: '1', order: 0 }),
+      shift('Night', { startHour: 18, hours: 12, id: '2', order: 1 }),
     ]);
     assert.deepEqual(problems, [{ kind: 'overlap', shift: 'Day', other: 'Night' }]);
     assert.match(shiftProblemMessage(problems[0]), /overlap/);
@@ -146,15 +146,15 @@ describe('validateShiftCycle', () => {
 
   it('a gap is allowed — a unit need not run all day', () => {
     assert.deepEqual(validateShiftCycle([
-      shift('Morning', { startHour: 8, hours: 4, id: 1, order: 0 }),
-      shift('Evening', { startHour: 16, hours: 4, id: 2, order: 1 }),
+      shift('Morning', { startHour: 8, hours: 4, id: '1', order: 0 }),
+      shift('Evening', { startHour: 16, hours: 4, id: '2', order: 1 }),
     ]), []);
   });
 
   it('more than 24 hours is rejected', () => {
     const problems = validateShiftCycle([
-      shift('A', { startHour: 0, hours: 13, id: 1, order: 0 }),
-      shift('B', { startHour: 13, hours: 13, id: 2, order: 1 }),
+      shift('A', { startHour: 0, hours: 13, id: '1', order: 0 }),
+      shift('B', { startHour: 13, hours: 13, id: '2', order: 1 }),
     ]);
     assert.ok(kinds(problems).includes('totalOverDay'));
     assert.ok(problems.some((p) => shiftProblemMessage(p).includes('24 hours')));
@@ -168,9 +168,9 @@ describe('validateShiftCycle', () => {
 
   it('the last shift may not run back over the first', () => {
     const problems = validateShiftCycle([
-      shift('A', { startHour: 15, hours: 8, id: 1, order: 0 }),
-      shift('B', { startHour: 23, hours: 8, id: 2, order: 1 }),
-      shift('C', { startHour: 7, hours: 10, id: 3, order: 2 }),
+      shift('A', { startHour: 15, hours: 8, id: '1', order: 0 }),
+      shift('B', { startHour: 23, hours: 8, id: '2', order: 1 }),
+      shift('C', { startHour: 7, hours: 10, id: '3', order: 2 }),
     ]);
     assert.ok(problems.some((p) => p.kind === 'runsPastStart' && p.shift === 'C' && p.other === 'A'));
     assert.ok(problems.some((p) => shiftProblemMessage(p).includes('runs past')));
@@ -187,7 +187,7 @@ describe('validateShiftCycle', () => {
   });
 
   it('a shift longer than a day is rejected', () => {
-    const tooLong = { id: 1, name: 'Endless', startMinute: 6 * 60, durationMinutes: 24 * 60 + 45, sortOrder: 0 };
+    const tooLong = { id: '1', name: 'Endless', startMinute: 6 * 60, durationMinutes: 24 * 60 + 45, sortOrder: 0 };
     const problems = validateShiftCycle([tooLong]);
     assert.deepEqual(kinds(problems), ['longerThanDay']);
     assert.match(shiftProblemMessage(problems[0]), /longer than a day/);
@@ -242,8 +242,8 @@ describe('presets', () => {
 describe('smart adjust', () => {
   it('sound shifts need no adjusting', () => {
     assert.equal(planSmartAdjust([
-      shift('Day', { startHour: 8, hours: 12, id: 1, order: 0 }),
-      shift('Night', { startHour: 20, hours: 12, id: 2, order: 1 }),
+      shift('Day', { startHour: 8, hours: 12, id: '1', order: 0 }),
+      shift('Night', { startHour: 20, hours: 12, id: '2', order: 1 }),
     ]), null);
   });
 
@@ -253,9 +253,9 @@ describe('smart adjust', () => {
 
   it('equal-length overlaps are fixed exactly', () => {
     const plan = planSmartAdjust([
-      shift('A', { startHour: 6, hours: 8, id: 1, order: 0 }),
-      shift('B', { startHour: 12, hours: 8, id: 2, order: 1 }),
-      shift('C', { startHour: 18, hours: 8, id: 3, order: 2 }),
+      shift('A', { startHour: 6, hours: 8, id: '1', order: 0 }),
+      shift('B', { startHour: 12, hours: 8, id: '2', order: 1 }),
+      shift('C', { startHour: 18, hours: 8, id: '3', order: 2 }),
     ])!;
     assert.equal(plan.confidence, 'exact');
     assert.deepEqual(plan.shifts.map((s) => s.startMinute), [6 * 60, 14 * 60, 22 * 60]);
@@ -264,9 +264,9 @@ describe('smart adjust', () => {
 
   it('the cycle keeps the start time it had', () => {
     const plan = planSmartAdjust([
-      shift('A', { startHour: 15, hours: 8, id: 1, order: 0 }),
-      shift('B', { startHour: 20, hours: 8, id: 2, order: 1 }),
-      shift('C', { startHour: 2, hours: 8, id: 3, order: 2 }),
+      shift('A', { startHour: 15, hours: 8, id: '1', order: 0 }),
+      shift('B', { startHour: 20, hours: 8, id: '2', order: 1 }),
+      shift('C', { startHour: 2, hours: 8, id: '3', order: 2 }),
     ])!;
     assert.equal(plan.shifts[0].startMinute, 15 * 60, 'a 3pm unit stays a 3pm unit');
     assert.deepEqual(plan.shifts.map((s) => s.startMinute), [15 * 60, 23 * 60, 7 * 60]);
@@ -274,8 +274,8 @@ describe('smart adjust', () => {
 
   it('uneven lengths are laid out but flagged for review', () => {
     const plan = planSmartAdjust([
-      shift('Long', { startHour: 8, hours: 10, id: 1, order: 0 }),
-      shift('Short', { startHour: 15, hours: 6, id: 2, order: 1 }),
+      shift('Long', { startHour: 8, hours: 10, id: '1', order: 0 }),
+      shift('Short', { startHour: 15, hours: 6, id: '2', order: 1 }),
     ])!;
     assert.equal(plan.confidence, 'needsReview');
     assert.deepEqual(plan.shifts.map((s) => s.startMinute), [8 * 60, 18 * 60]);
@@ -285,17 +285,17 @@ describe('smart adjust', () => {
 
   it('a partly covered day is called out', () => {
     const plan = planSmartAdjust([
-      shift('A', { startHour: 8, hours: 6, id: 1, order: 0 }),
-      shift('B', { startHour: 10, hours: 6, id: 2, order: 1 }),
+      shift('A', { startHour: 8, hours: 6, id: '1', order: 0 }),
+      shift('B', { startHour: 10, hours: 6, id: '2', order: 1 }),
     ])!;
     assert.ok(smartAdjustNotes(plan).some((n) => n.includes('unassigned')));
   });
 
   it('shifts totalling more than a day are shortened evenly', () => {
     const plan = planSmartAdjust([
-      shift('A', { startHour: 0, hours: 10, id: 1, order: 0 }),
-      shift('B', { startHour: 8, hours: 10, id: 2, order: 1 }),
-      shift('C', { startHour: 16, hours: 10, id: 3, order: 2 }),
+      shift('A', { startHour: 0, hours: 10, id: '1', order: 0 }),
+      shift('B', { startHour: 8, hours: 10, id: '2', order: 1 }),
+      shift('C', { startHour: 16, hours: 10, id: '3', order: 2 }),
     ])!;
     assert.equal(plan.confidence, 'needsReview');
     assert.ok(plan.shifts.every((s) => s.durationMinutes === 8 * 60));
@@ -305,7 +305,7 @@ describe('smart adjust', () => {
 
   it('an uneven split gives the remainder to the first shift', () => {
     const plan = planSmartAdjust(
-      Array.from({ length: 7 }, (_, i) => shift(`S${i}`, { startHour: 0, hours: 5, id: i + 1, order: i })),
+      Array.from({ length: 7 }, (_, i) => shift(`S${i}`, { startHour: 0, hours: 5, id: String(i + 1), order: i })),
     )!;
     assert.equal(plan.shifts.reduce((sum, s) => sum + s.durationMinutes, 0), MINUTES_PER_DAY, 'the day is fully covered');
     assert.ok(plan.shifts[0].durationMinutes > plan.shifts[plan.shifts.length - 1].durationMinutes);
@@ -314,15 +314,15 @@ describe('smart adjust', () => {
   it('the adjusted result always validates', () => {
     const cases = [
       [
-        shift('A', { startHour: 6, hours: 8, id: 1, order: 0 }),
-        shift('B', { startHour: 10, hours: 8, id: 2, order: 1 }),
+        shift('A', { startHour: 6, hours: 8, id: '1', order: 0 }),
+        shift('B', { startHour: 10, hours: 8, id: '2', order: 1 }),
       ],
       [
-        shift('A', { startHour: 22, hours: 10, id: 1, order: 0 }),
-        shift('B', { startHour: 2, hours: 10, id: 2, order: 1 }),
-        shift('C', { startHour: 10, hours: 10, id: 3, order: 2 }),
+        shift('A', { startHour: 22, hours: 10, id: '1', order: 0 }),
+        shift('B', { startHour: 2, hours: 10, id: '2', order: 1 }),
+        shift('C', { startHour: 10, hours: 10, id: '3', order: 2 }),
       ],
-      [shift('Solo', { startHour: 13, hours: 30, id: 1, order: 0 })],
+      [shift('Solo', { startHour: 13, hours: 30, id: '1', order: 0 })],
     ];
     for (const input of cases) {
       const adjusted = planSmartAdjust(input)!.shifts.map((p, i) => ({ ...p, sortOrder: i }));
@@ -333,8 +333,8 @@ describe('smart adjust', () => {
 
 describe('workingDayAt', () => {
   const dayNight = [
-    shift('Day', { startHour: 8, hours: 12, id: 1, order: 0 }),
-    shift('Night', { startHour: 20, hours: 12, id: 2, order: 1 }),
+    shift('Day', { startHour: 8, hours: 12, id: '1', order: 0 }),
+    shift('Night', { startHour: 20, hours: 12, id: '2', order: 1 }),
   ];
 
   it('the small hours belong to the night that began the evening before', () => {
@@ -348,8 +348,8 @@ describe('workingDayAt', () => {
 
   it('a cycle anchored at 3pm runs to 3pm the next day', () => {
     const afternoon = [
-      shift('A', { startHour: 15, hours: 12, id: 1, order: 0 }),
-      shift('B', { startHour: 3, hours: 12, id: 2, order: 1 }),
+      shift('A', { startHour: 15, hours: 12, id: '1', order: 0 }),
+      shift('B', { startHour: 3, hours: 12, id: '2', order: 1 }),
     ];
     assert.equal(workingDayAt(afternoon, '2026-03-01', at(14, 59)), '2026-02-28');
     assert.equal(workingDayAt(afternoon, '2026-03-01', at(15)), '2026-03-01');

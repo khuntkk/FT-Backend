@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { isId } from '@stitchflow/contract';
 import { after, before, describe, it } from 'node:test';
 import { todayIn } from '@stitchflow/contract';
 import { seedProperty, signInAll, startHarness, type Client, type Harness, type SeededProperty } from './helpers.ts';
@@ -6,11 +7,11 @@ import { seedProperty, signInAll, startHarness, type Client, type Harness, type 
 let h: Harness;
 let p: SeededProperty;
 let as: Record<string, Client>;
-let ravi: number;
-let sita: number;
+let ravi: string;
+let sita: string;
 
 const person = async (name: string, propertyId = p.propertyId) =>
-  (await h.sql(`insert into staff (property_id, name) values ($1, $2) returning id`, [propertyId, name]))[0].id as number;
+  (await h.sql(`insert into staff (property_id, name) values ($1, $2) returning id`, [propertyId, name]))[0].id as string;
 
 before(async () => {
   h = await startHarness();
@@ -25,7 +26,7 @@ describe('advances', () => {
   it('records an advance, rounded to the paisa', async () => {
     const res = await as.admin.post('/v1/advances', { staffId: ravi, givenOn: '2026-08-05', amount: 2000, mode: 'cash' });
     assert.equal(res.status, 200);
-    assert.equal(typeof res.body.id, 'number');
+    assert.ok(isId(res.body.id), `a UUID id, got ${res.body.id}`);
     assert.deepEqual({ ...res.body, id: 0, createdAt: '' }, {
       id: 0, staffId: ravi, givenOn: '2026-08-05', amount: 2000, mode: 'cash', note: null, createdAt: '',
     });

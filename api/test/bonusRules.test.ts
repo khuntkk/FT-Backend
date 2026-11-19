@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { isId } from '@stitchflow/contract';
 import { after, before, describe, it } from 'node:test';
 import { seedProperty, signInAll, startHarness, type Client, type Harness, type SeededProperty } from './helpers.ts';
 
@@ -35,7 +36,7 @@ describe('bonus rules', () => {
     assert.equal(fullHead.sortOrder, 2);
     assert.deepEqual(fullHead.slabs.map((s: any) => [s.fromStitches, s.toStitches, s.value]),
       [[0, 100000, 1], [100000, 200000, 1.5], [200000, null, 2]]);
-    assert.equal(typeof fullHead.slabs[0].id, 'number');
+    assert.ok(isId(fullHead.slabs[0].id), `a UUID id, got ${fullHead.slabs[0].id}`);
   });
 
   it('lists rules in matching order: sort order, then id', async () => {

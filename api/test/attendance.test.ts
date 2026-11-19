@@ -5,14 +5,14 @@ import { seedProperty, signInAll, startHarness, type Client, type Harness, type 
 let h: Harness;
 let p: SeededProperty;
 let as: Record<string, Client>;
-let asha: number;
-let bharat: number;
-let chetan: number;
-let gone: number;
-let day: number;
-let night: number;
+let asha: string;
+let bharat: string;
+let chetan: string;
+let gone: string;
+let day: string;
+let night: string;
 
-async function person(name: string, extra: Record<string, unknown> = {}): Promise<number> {
+async function person(name: string, extra: Record<string, unknown> = {}): Promise<string> {
   const cols = ['property_id', 'name', ...Object.keys(extra)];
   const [{ id }] = await h.sql(
     `insert into staff (${cols.join(', ')}) values (${cols.map((_, i) => `$${i + 1}`).join(', ')}) returning id`,
@@ -22,7 +22,7 @@ async function person(name: string, extra: Record<string, unknown> = {}): Promis
 }
 
 /** A slip on machine `number` with its crew: [staffId, isHalfDay]. */
-async function slip(number: number, date: string, shiftId: number, crew: [number, boolean][], stitchBased = false) {
+async function slip(number: number, date: string, shiftId: string, crew: [string, boolean][], stitchBased = false) {
   const [{ id: machineId }] = await h.sql(
     `insert into machines (property_id, number) values ($1, $2)
      on conflict (property_id, number) where deleted_at is null do update set name = machines.name returning id`,
@@ -43,7 +43,7 @@ async function slip(number: number, date: string, shiftId: number, crew: [number
 const binItems = () =>
   h.sql(`select * from vw_recycle_bin where property_id = $1 and kind = 'attendance'`, [p.propertyId]);
 
-const days = async (c: Client, staffId: number, from: string, to: string) =>
+const days = async (c: Client, staffId: string, from: string, to: string) =>
   (await c.get(`/v1/staff/${staffId}/attendance`, { from, to })).body;
 
 before(async () => {

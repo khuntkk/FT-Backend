@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import { todayIn } from '@stitchflow/contract';
 import { hashPassword } from '../src/auth/passwords.ts';
 import {
-  Client, PASSWORD, seedProperty, signIn, signInAll, startHarness, type Harness, type SeededProperty,
+  Client, NO_SUCH_ID, PASSWORD, seedProperty, signIn, signInAll, startHarness, type Harness, type SeededProperty,
 } from './helpers.ts';
 
 let h: Harness;
@@ -11,11 +11,11 @@ let p: SeededProperty;
 let as: Record<string, Client>;
 let admin: Client;
 let support: Client;
-let adminId: number;
-let supportId: number;
+let adminId: string;
+let supportId: string;
 
 /** Console staff made directly, as the create-platform-admin script would. */
-async function makeStaff(email: string, role: 'admin' | 'support'): Promise<number> {
+async function makeStaff(email: string, role: 'admin' | 'support'): Promise<string> {
   const [{ id }] = await h.sql(
     `insert into users (display_name, email, password_hash, must_change_password)
      values ($1, $2, $3, false) returning id`,
@@ -70,7 +70,7 @@ describe('who may call the console', () => {
     for (const res of [
       await support.post('/v1/platform/properties', newProperty()),
       await support.patch(`/v1/platform/properties/${p.propertyId}`, { machineLimit: 1 }),
-      await support.post(`/v1/platform/properties/${p.propertyId}/transfer-ownership`, { toMemberId: 1 }),
+      await support.post(`/v1/platform/properties/${p.propertyId}/transfer-ownership`, { toMemberId: NO_SUCH_ID }),
       await support.post(`/v1/platform/users/${p.members.worker.userId}/disable`),
       await support.post(`/v1/platform/users/${p.members.worker.userId}/enable`),
       await support.patch(`/v1/platform/users/${p.members.worker.userId}`, { displayName: 'X' }),
@@ -207,7 +207,7 @@ describe('reading properties', () => {
     assert.ok(Array.isArray(res.body.members[0].modules));
     assert.equal(res.body.machineCount, 0);
     assert.equal(res.body.staffCount, 0);
-    assert.equal((await support.get('/v1/platform/properties/999999')).status, 404);
+    assert.equal((await support.get(`/v1/platform/properties/${NO_SUCH_ID}`)).status, 404);
   });
 });
 
@@ -229,7 +229,7 @@ describe('changing a property', () => {
     });
     assert.equal(res.status, 400, JSON.stringify(res.body));
     assert.deepEqual(res.body.error.details.fields, { timezone: 'unknown', machineLimit: 'range', name: 'length' });
-    assert.equal((await admin.patch('/v1/platform/properties/999999', { name: 'X' })).status, 404);
+    assert.equal((await admin.patch(`/v1/platform/properties/${NO_SUCH_ID}`, { name: 'X' })).status, 404);
   });
 
   it('suspending ends the members\' sessions; reactivating lets them back', async () => {
@@ -314,7 +314,7 @@ describe('users', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.memberships[0].role, 'worker');
     assert.equal(res.body.liveSessions, 1);
-    assert.equal((await support.get('/v1/platform/users/999999')).status, 404);
+    assert.equal((await support.get(`/v1/platform/users/${NO_SUCH_ID}`)).status, 404);
   });
 
   it('support resets a unit user\'s password, ending their sessions', async () => {
@@ -363,7 +363,7 @@ describe('users', () => {
     await refreshFails(supervisor);
     const u = await support.get(`/v1/platform/users/${p.members.supervisor.userId}`);
     assert.equal(u.body.liveSessions, 0);
-    assert.equal((await support.del('/v1/platform/users/999999/sessions')).status, 404);
+    assert.equal((await support.del(`/v1/platform/users/${NO_SUCH_ID}/sessions`)).status, 404);
   });
 
   it('an admin changes a user\'s name and what they sign in with; they sign in with the new one', async () => {
@@ -402,13 +402,13 @@ describe('users', () => {
     assert.deepEqual(nothing.body.error.details.fields, { phone: 'needsIdentifier' });
     const staffEmail = await admin.patch(`/v1/platform/users/${supportId}`, { email: null });
     assert.deepEqual(staffEmail.body.error.details.fields, { email: 'required' });
-    assert.equal((await admin.patch('/v1/platform/users/999999', { displayName: 'X' })).status, 404);
+    assert.equal((await admin.patch(`/v1/platform/users/${NO_SUCH_ID}`, { displayName: 'X' })).status, 404);
   });
 });
 
 describe('our console staff', () => {
   let newcomer: Client;
-  let newcomerId: number;
+  let newcomerId: string;
 
   it('lists them, admin only', async () => {
     const res = await admin.get('/v1/platform/staff');

@@ -9,9 +9,7 @@
 //
 // `today` is always the property's date, passed in by the handler.
 
-import type {
-  RestoreShiftsInput, SchemeInput, Shift, ShiftInput, ShiftPatch, ShiftTiming,
-} from '@stitchflow/contract';
+import type { Id, RestoreShiftsInput, SchemeInput, Shift, ShiftInput, ShiftPatch, ShiftTiming } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { orderedCycle, presetShifts, shiftProblemMessage, validateShiftCycle } from '../domain/shifts.ts';
 import { ApiError, notFound } from '../http/errors.ts';
@@ -43,7 +41,7 @@ export async function on(tx: Tx, date: string): Promise<Shift[]> {
 }
 
 /** Any version, retired ones included. */
-export async function get(tx: Tx, id: number): Promise<Shift> {
+export async function get(tx: Tx, id: Id): Promise<Shift> {
   const s = await tx.one<Shift>(`select ${SHIFT_COLUMNS} from shifts s where s.id = $1`, [id]);
   if (!s) throw notFound('No such shift.');
   return s;
@@ -75,14 +73,14 @@ export async function editable(tx: Tx, today: string): Promise<Shift[]> {
  * That guarantee is also what lets the versioning below drop or rewrite a
  * version starting on or after the answer: nothing can point at one.
  */
-export async function earliestEffectiveDate(tx: Tx, today: string, shiftIds: number[]): Promise<string> {
+export async function earliestEffectiveDate(tx: Tx, today: string, shiftIds: Id[]): Promise<string> {
   const row = await tx.one<{ date: string }>(
     `select greatest($1::date, max(s.effective_from), max(s.effective_to),
                      (select max(e.work_date) + 1
                       from production_entries e
                       join shifts v on v.id = e.shift_id
                       where e.work_date >= $1
-                        and v.lineage_id in (select lineage_id from shifts where id = any($2::bigint[])))
+                        and v.lineage_id in (select lineage_id from shifts where id = any($2::uuid[])))
            ) as date
      from shifts s`,
     [today, shiftIds],
@@ -107,9 +105,9 @@ async function assertSound(tx: Tx, day: string): Promise<Shift[]> {
  * the two merge back into one: switching a scheme away and back, or undoing
  * an edit, leaves no history behind. Returns the version now covering `day`.
  */
-async function openVersion(tx: Tx, member: Member, lineageId: number, t: Timing, day: string): Promise<number> {
+async function openVersion(tx: Tx, member: Member, lineageId: Id, t: Timing, day: string): Promise<Id> {
   const written = await writeVersion(tx, member, lineageId, t, day);
-  const predecessor = await tx.one<{ id: number }>(
+  const predecessor = await tx.one<{ id: Id }>(
     `select id from shifts
      where lineage_id = $1 and id <> $2 and effective_from < $3 and effective_to = $3
        and name = $4 and start_minute = $5 and duration_minutes = $6
@@ -135,8 +133,8 @@ async function openVersion(tx: Tx, member: Member, lineageId: number, t: Timing,
 }
 
 /** Rewrites the version starting on `day`, or closes the open one and inserts a new one. */
-async function writeVersion(tx: Tx, member: Member, lineageId: number, t: Timing, day: string): Promise<number> {
-  const sameDay = await tx.one<{ id: number }>(
+async function writeVersion(tx: Tx, member: Member, lineageId: Id, t: Timing, day: string): Promise<Id> {
+  const sameDay = await tx.one<{ id: Id }>(
     `update shifts set name = $3, start_minute = $4, duration_minutes = $5, sort_order = $6,
                        effective_to = null, updated_by_member_id = $7
      where id = (select id from shifts where lineage_id = $1 and effective_from = $2 order by id desc limit 1)
@@ -145,7 +143,7 @@ async function writeVersion(tx: Tx, member: Member, lineageId: number, t: Timing
   );
   if (sameDay) return sameDay.id;
   await closeOpenVersions(tx, member, lineageId, day);
-  const row = await tx.one<{ id: number }>(
+  const row = await tx.one<{ id: Id }>(
     `insert into shifts (property_id, lineage_id, name, start_minute, duration_minutes, sort_order,
                          effective_from, created_by_member_id, updated_by_member_id)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $8) returning id`,
@@ -155,7 +153,7 @@ async function writeVersion(tx: Tx, member: Member, lineageId: number, t: Timing
 }
 
 /** Ends every still-open version of a lineage that began before `day`. */
-async function closeOpenVersions(tx: Tx, member: Member, lineageId: number, day: string): Promise<void> {
+async function closeOpenVersions(tx: Tx, member: Member, lineageId: Id, day: string): Promise<void> {
   await tx.exec(
     `update shifts set effective_to = $2, updated_by_member_id = $3
      where lineage_id = $1 and effective_to is null and effective_from < $2`,
@@ -170,7 +168,7 @@ async function closeOpenVersions(tx: Tx, member: Member, lineageId: number, day:
  * deleting a version; should one ever point at it, it is kept as an empty
  * range ([from, from): never applied) instead.
  */
-async function retireLineage(tx: Tx, member: Member, lineageId: number, day: string): Promise<void> {
+async function retireLineage(tx: Tx, member: Member, lineageId: Id, day: string): Promise<void> {
   await tx.exec(
     `delete from shifts s
      where s.lineage_id = $1 and s.effective_from >= $2
@@ -187,8 +185,8 @@ async function retireLineage(tx: Tx, member: Member, lineageId: number, day: str
 }
 
 /** Inserts a shift with no history behind it; the trigger points its lineage at itself. */
-async function insertLineage(tx: Tx, member: Member, t: Timing, day: string): Promise<number> {
-  const row = await tx.one<{ id: number }>(
+async function insertLineage(tx: Tx, member: Member, t: Timing, day: string): Promise<Id> {
+  const row = await tx.one<{ id: Id }>(
     `insert into shifts (property_id, name, start_minute, duration_minutes, sort_order, effective_from,
                          created_by_member_id, updated_by_member_id)
      values ($1, $2, $3, $4, $5, $6, $7, $7) returning id`,
@@ -237,7 +235,7 @@ export async function create(tx: Tx, member: Member, today: string, input: Shift
 }
 
 /** Opens a version of the shift from the earliest safe date; returns the version covering it. */
-export async function update(tx: Tx, member: Member, today: string, id: number, patch: ShiftPatch): Promise<Shift> {
+export async function update(tx: Tx, member: Member, today: string, id: Id, patch: ShiftPatch): Promise<Shift> {
   const shift = await get(tx, id);
   const day = await earliestEffectiveDate(tx, today, [id]);
   const written = await openVersion(tx, member, shift.lineageId, {
@@ -254,15 +252,15 @@ export async function update(tx: Tx, member: Member, today: string, id: number, 
  * Takes the shift out of the cycle from the earliest safe date. Not checked
  * for clashes: fewer shifts can only clash less.
  */
-export async function retire(tx: Tx, member: Member, today: string, id: number): Promise<void> {
+export async function retire(tx: Tx, member: Member, today: string, id: Id): Promise<void> {
   const shift = await get(tx, id);
   const day = await earliestEffectiveDate(tx, today, [id]);
   await retireLineage(tx, member, shift.lineageId, day);
 }
 
 /** The shifts named, every one of them in this property. */
-async function getAll(tx: Tx, ids: number[]): Promise<Shift[]> {
-  const found = await tx.rows<Shift>(`select ${SHIFT_COLUMNS} from shifts s where s.id = any($1::bigint[])`, [ids]);
+async function getAll(tx: Tx, ids: Id[]): Promise<Shift[]> {
+  const found = await tx.rows<Shift>(`select ${SHIFT_COLUMNS} from shifts s where s.id = any($1::uuid[])`, [ids]);
   const byId = new Map(found.map((s) => [s.id, s]));
   return ids.map((id) => {
     const s = byId.get(id);
@@ -293,7 +291,7 @@ export async function applyTimings(tx: Tx, member: Member, today: string, timing
  */
 export async function restore(tx: Tx, member: Member, today: string, input: RestoreShiftsInput): Promise<Shift[]> {
   const named = await getAll(tx, input.shifts.map((s) => s.id));
-  const wanted = new Map<number, Timing>();
+  const wanted = new Map<Id, Timing>();
   input.shifts.forEach((s, i) => wanted.set(named[i].lineageId, {
     name: s.name, startMinute: s.startMinute, durationMinutes: s.durationMinutes, sortOrder: i,
   }));

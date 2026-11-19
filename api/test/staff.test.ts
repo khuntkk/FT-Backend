@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { isId } from '@stitchflow/contract';
 import { after, before, describe, it } from 'node:test';
-import { seedProperty, signInAll, startHarness, type Client, type Harness, type SeededProperty } from './helpers.ts';
+import { type Client, type Harness, NO_SUCH_ID, type SeededProperty, seedProperty, signInAll, startHarness } from './helpers.ts';
 
 let h: Harness;
 let p: SeededProperty;
@@ -27,7 +28,7 @@ describe('staff', () => {
     const res = await add({ name: '  Ramesh ', code: ' 001 ', phone: '  ', monthlySalary: 15000.5 });
     assert.equal(res.status, 200);
     const s = res.body;
-    assert.equal(typeof s.id, 'number');
+    assert.ok(isId(s.id), `a UUID id, got ${s.id}`);
     assert.equal(s.name, 'Ramesh');
     assert.equal(s.code, '001');
     assert.equal(s.phone, null);
@@ -93,8 +94,8 @@ describe('staff', () => {
     const one = await as.viewAdmin.get(`/v1/staff/${ramesh.id}`);
     assert.equal(one.status, 200);
     assert.equal(one.body.notes, 'night');
-    assert.equal((await as.admin.patch('/v1/staff/999999', { name: 'x' })).status, 404);
-    assert.equal((await as.admin.get('/v1/staff/999999')).status, 404);
+    assert.equal((await as.admin.patch(`/v1/staff/${NO_SUCH_ID}`, { name: 'x' })).status, 404);
+    assert.equal((await as.admin.get(`/v1/staff/${NO_SUCH_ID}`)).status, 404);
   });
 
   it('never shows the roster to a supervisor or an operator, but gives them operators without pay', async () => {

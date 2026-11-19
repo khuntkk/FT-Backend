@@ -5,7 +5,7 @@
 -- rules (a change waits for tomorrow once today has slips; the working day
 -- after midnight is still yesterday on a night shift) all start from this.
 
-create or replace function fn_property_today(p_property_id bigint) returns date
+create or replace function fn_property_today(p_property_id uuid) returns date
 language sql stable as $$
   select (now() at time zone p.timezone)::date
   from properties p

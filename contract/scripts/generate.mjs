@@ -17,6 +17,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { id } from '../spec/dsl.mjs';
 import { endpoints, pathParamTypes } from '../spec/endpoints.mjs';
 import { errors } from '../spec/errors.mjs';
 import { enums, objects } from '../spec/models.mjs';
@@ -141,7 +142,7 @@ for (const ep of endpoints) {
   const parameters = [
     ...pathParams(ep.path).map((name) => ({
       name, in: 'path', required: true,
-      schema: oas(pathParamTypes[name] ?? { kind: 'integer', format: 'int64' }),
+      schema: oas(pathParamTypes[name] ?? { ...id, doc: undefined }),
     })),
     ...Object.entries(ep.query ?? {}).map(([name, s]) => ({
       name, in: 'query', required: !s.optional,
@@ -241,6 +242,8 @@ import type { ErrorCode } from './errors.js';
 
 export type { ActionKey, ModuleKey, ErrorCode };
 
+/** A server-issued id: a lower-case, time-ordered UUID. */
+export type Id = string;
 /** A calendar date with no time: "YYYY-MM-DD". */
 export type DateOnly = string;
 /** An instant, ISO-8601 UTC: "2026-09-27T09:30:00Z". */
@@ -276,7 +279,7 @@ export interface ApiRoutes {
 const routeRows = [];
 for (const ep of endpoints) {
   const key = `${ep.method} ${ep.path}`;
-  const params = pathParams(ep.path).map((p) => `${p}: ${pathParamTypes[p] ? (pathParamTypes[p].kind === 'ref' ? `T.${pathParamTypes[p].name}` : 'string') : 'number'}`);
+  const params = pathParams(ep.path).map((p) => `${p}: ${pathParamTypes[p] ? (pathParamTypes[p].kind === 'ref' ? `T.${pathParamTypes[p].name}` : 'string') : 'T.Id'}`);
   const query = Object.entries(ep.query ?? {}).map(([k, v]) => `${k}${v.optional ? '?' : ''}: ${qualify(ts({ ...v, optional: undefined }))}`);
   const body = ep.body === 'multipart' ? 'FormData' : ep.body ? qualify(ts(ep.body)) : 'undefined';
   const response = typeof ep.response === 'object' && ep.response !== null ? qualify(ts(ep.response)) : 'void';

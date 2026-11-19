@@ -2,13 +2,14 @@
 // arrangement and day start are schedule changes and go through
 // /shifts/scheme, which is super admin only.
 
+import type { Id } from '@stitchflow/contract';
 import { roundMoney, type PropertySettings, type SettingsPatch } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { invalid } from '../http/errors.ts';
 import type { Member } from '../http/types.ts';
 import { getSettings } from './shapes.ts';
 
-export async function get(tx: Tx, propertyId: number): Promise<PropertySettings> {
+export async function get(tx: Tx, propertyId: Id): Promise<PropertySettings> {
   return (await getSettings(tx, propertyId))!;
 }
 
@@ -22,7 +23,7 @@ const PATCHABLE: Record<string, string> = {
 // dropped silently; refusing them tells the app it used the wrong route.
 const SCHEDULE_KEYS = ['shiftScheme', 'dayStartMinute'];
 
-export async function update(tx: Tx, propertyId: number, patch: SettingsPatch): Promise<PropertySettings> {
+export async function update(tx: Tx, propertyId: Id, patch: SettingsPatch): Promise<PropertySettings> {
   const misplaced = SCHEDULE_KEYS.filter((k) => k in patch);
   if (misplaced.length) {
     throw invalid(Object.fromEntries(misplaced.map((k) => [k, 'useShiftsScheme'])),

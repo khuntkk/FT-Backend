@@ -3,11 +3,11 @@
 //
 // What is in the bin is vw_recycle_bin's business: a child deleted with its
 // parent shares the parent's deleted_batch and is folded into it, a cleared
-// month is one item named by its lowest id, and anything past
+// month is one item named by its first mark's id, and anything past
 // fn_recovery_window() has dropped out. Every route here starts by finding
 // its item in that view, so "not in the bin" is one 404 whatever the reason.
 
-import type { ActionKey, DeletedItem, DeletedKind, RestoreProblem } from '@stitchflow/contract';
+import type { ActionKey, DeletedItem, DeletedKind, Id, RestoreProblem } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { ApiError, notFound, onConstraint } from '../http/errors.ts';
 import type { Member } from '../http/types.ts';
@@ -46,7 +46,7 @@ export const RESTORE_ALSO_NEEDS: Partial<Record<DeletedKind, ActionKey>> = {
   salaryPayment: 'payroll.mark_paid',
 };
 
-async function find(tx: Tx, kind: DeletedKind, id: number): Promise<DeletedItem> {
+async function find(tx: Tx, kind: DeletedKind, id: Id): Promise<DeletedItem> {
   const item = await tx.one<DeletedItem>(
     `select ${ITEM_COLUMNS} from vw_recycle_bin where kind = $1 and id = $2`, [kind, id]);
   if (!item) throw notFound('Not in the recycle bin.');
@@ -69,18 +69,18 @@ const CLEAR = `deleted_at = null, deleted_by_member_id = null, deleted_batch = n
  * one added since. A machine past the limit is refused by the database
  * (constraint machine_limit → 409 machine_limit_reached).
  */
-export async function restore(tx: Tx, member: Member, kind: DeletedKind, id: number): Promise<DeletedItem> {
+export async function restore(tx: Tx, member: Member, kind: DeletedKind, id: Id): Promise<DeletedItem> {
   const item = await find(tx, kind, id);
   await RESTORE[kind](tx, member.memberId, id);
   return item;
 }
 
-const RESTORE: Record<DeletedKind, (tx: Tx, by: number, id: number) => Promise<void>> = {
+const RESTORE: Record<DeletedKind, (tx: Tx, by: Id, id: Id) => Promise<void>> = {
   machine: restoreMachine,
   staff: restoreStaff,
   productionEntry: restoreEntry,
   upad: async (tx, by, id) => {
-    const a = await tx.one<{ staffId: number }>(`select staff_id as "staffId" from advances where id = $1`, [id]);
+    const a = await tx.one<{ staffId: Id }>(`select staff_id as "staffId" from advances where id = $1`, [id]);
     await requireLiveStaff(tx, a!.staffId);
     await tx.exec(`update advances set ${CLEAR} where id = $1`, [id, by]);
   },
@@ -89,7 +89,7 @@ const RESTORE: Record<DeletedKind, (tx: Tx, by: number, id: number) => Promise<v
     await tx.exec(`update bonus_rules set ${CLEAR} where id = $1`, [id, by]);
   },
   attendance: async (tx, by, id) => {
-    const mark = await tx.one<{ staffId: number; batch: string }>(
+    const mark = await tx.one<{ staffId: Id; batch: string }>(
       `select staff_id as "staffId", deleted_batch as batch from attendance_marks where id = $1`, [id]);
     await requireLiveStaff(tx, mark!.staffId);
     // Days marked again since the clear left the batch when they were marked,
@@ -99,7 +99,7 @@ const RESTORE: Record<DeletedKind, (tx: Tx, by: number, id: number) => Promise<v
   },
 };
 
-async function restoreMachine(tx: Tx, by: number, id: number) {
+async function restoreMachine(tx: Tx, by: Id, id: Id) {
   const m = await tx.one<{ number: number; name: string | null; batch: string | null }>(
     `select number, name, deleted_batch as batch from machines where id = $1`, [id]);
   const taken = () => blocked('machineNumberTaken', { name: m!.name, number: m!.number });
@@ -113,7 +113,7 @@ async function restoreMachine(tx: Tx, by: number, id: number) {
   }
 }
 
-async function restoreStaff(tx: Tx, by: number, id: number) {
+async function restoreStaff(tx: Tx, by: Id, id: Id) {
   const s = await tx.one<{ code: string | null; batch: string | null }>(
     `select code, deleted_batch as batch from staff where id = $1`, [id]);
   await onConstraint(tx.exec(`update staff set ${CLEAR} where id = $1`, [id, by]), 'staff_live_code',
@@ -129,7 +129,7 @@ async function restoreStaff(tx: Tx, by: number, id: number) {
 // machine: brought back alone it would count toward attendance and bonus
 // while no screen could show it. Shifts are retired, never deleted, and a
 // deleted operator's slips stay live anyway, so the machine is the only parent.
-async function restoreEntry(tx: Tx, by: number, id: number) {
+async function restoreEntry(tx: Tx, by: Id, id: Id) {
   const m = await tx.one<{ name: string | null; number: number; deleted: boolean }>(
     `select m.name, m.number, m.deleted_at is not null as deleted
      from production_entries e join machines m on m.id = e.machine_id where e.id = $1`, [id]);
@@ -137,8 +137,8 @@ async function restoreEntry(tx: Tx, by: number, id: number) {
   await tx.exec(`update production_entries set ${CLEAR} where id = $1`, [id, by]);
 }
 
-async function restorePayslip(tx: Tx, by: number, id: number) {
-  const p = await tx.one<{ staffId: number; paidAgain: boolean }>(
+async function restorePayslip(tx: Tx, by: Id, id: Id) {
+  const p = await tx.one<{ staffId: Id; paidAgain: boolean }>(
     `select p.staff_id as "staffId",
             exists (select 1 from salary_payments q where q.staff_id = p.staff_id
                     and q.period_start = p.period_start and q.deleted_at is null) as "paidAgain"
@@ -150,7 +150,7 @@ async function restorePayslip(tx: Tx, by: number, id: number) {
 }
 
 /** A person's records come back with them, not before them. */
-async function requireLiveStaff(tx: Tx, staffId: number) {
+async function requireLiveStaff(tx: Tx, staffId: Id) {
   const s = await tx.one<{ name: string }>(`select name from staff where id = $1 and deleted_at is not null`, [staffId]);
   if (s) throw blocked('parentDeleted', { name: s.name });
 }
@@ -160,7 +160,7 @@ async function requireLiveStaff(tx: Tx, staffId: number) {
 // ---------------------------------------------------------------------------
 
 /** Removes an item for good before its window is up. Returns it as it was. */
-export async function deleteForever(tx: Tx, kind: DeletedKind, id: number): Promise<DeletedItem> {
+export async function deleteForever(tx: Tx, kind: DeletedKind, id: Id): Promise<DeletedItem> {
   const item = await find(tx, kind, id);
   await FOREVER[kind](tx, id);
   return item;
@@ -170,7 +170,7 @@ export async function deleteForever(tx: Tx, kind: DeletedKind, id: number): Prom
 // bin without removing it.
 const BEYOND_WINDOW = `now() - fn_recovery_window() - interval '1 day'`;
 
-const FOREVER: Record<DeletedKind, (tx: Tx, id: number) => Promise<unknown>> = {
+const FOREVER: Record<DeletedKind, (tx: Tx, id: Id) => Promise<unknown>> = {
   machine: machineForever,
   staff: staffForever,
   productionEntry: (tx, id) => tx.exec(`delete from production_entries where id = $1 and deleted_at is not null`, [id]),
@@ -187,7 +187,7 @@ const FOREVER: Record<DeletedKind, (tx: Tx, id: number) => Promise<unknown>> = {
 // it (restore_blocked parentDeleted), and the foreign key is restrict so a
 // purge cannot take a live slip by accident. A live slip on a deleted machine
 // should not exist; if one does, the machine is kept out of sight instead.
-async function machineForever(tx: Tx, id: number) {
+async function machineForever(tx: Tx, id: Id) {
   await tx.exec(`delete from production_entries where machine_id = $1 and deleted_at is not null`, [id]);
   const removed = await tx.exec(
     `delete from machines m where m.id = $1
@@ -199,7 +199,7 @@ async function machineForever(tx: Tx, id: number) {
 // restricts it, because removing them would hand their share of each slip's
 // bonus to whoever else was on the machine. Their advances, payslips and
 // marks go either way — that is what deleting them forever means.
-async function staffForever(tx: Tx, id: number) {
+async function staffForever(tx: Tx, id: Id) {
   for (const table of ['advances', 'salary_payments', 'attendance_marks']) {
     await tx.exec(`delete from ${table} where staff_id = $1`, [id]);
   }

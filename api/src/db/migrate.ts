@@ -1,5 +1,7 @@
 // Applies db/migrations (once each, in order, recorded in schema_migrations)
-// and then every file in db/views (create or replace, every time).
+// and then every file in db/views (create or replace, every time), all in
+// one transaction: if a view fails, the migrations before it roll back too,
+// so a deploy never leaves a new schema without the views it needs.
 //
 //   npm run migrate        uses MIGRATION_DATABASE_URL, else DATABASE_URL
 //
@@ -27,27 +29,25 @@ export async function migrate(db: Queryable, log: (s: string) => void = () => {}
     filename text primary key, applied_at timestamptz not null default now())`);
   const done = new Set((await db.query(`select filename from schema_migrations`)).rows.map((r) => r.filename));
   const applied: string[] = [];
-  for (const m of sqlFiles('migrations')) {
-    if (done.has(m.name)) continue;
-    log(`migrating ${m.name}`);
-    await db.query('begin');
-    try {
-      await db.query(m.sql);
-      await db.query(`insert into schema_migrations (filename) values ($1)`, [m.name]);
-      await db.query('commit');
-    } catch (e) {
-      await db.query('rollback');
-      throw new Error(`${m.name}: ${(e as Error).message}`);
-    }
-    applied.push(m.name);
-  }
+  let current = 'views';
   await db.query('begin');
   try {
-    for (const v of sqlFiles('views')) await db.query(v.sql);
+    for (const m of sqlFiles('migrations')) {
+      if (done.has(m.name)) continue;
+      current = m.name;
+      log(`migrating ${m.name}`);
+      await db.query(m.sql);
+      await db.query(`insert into schema_migrations (filename) values ($1)`, [m.name]);
+      applied.push(m.name);
+    }
+    for (const v of sqlFiles('views')) {
+      current = v.name;
+      await db.query(v.sql);
+    }
     await db.query('commit');
   } catch (e) {
     await db.query('rollback');
-    throw e;
+    throw new Error(`${current}: ${(e as Error).message}`);
   }
   log('views and functions applied');
   return applied;

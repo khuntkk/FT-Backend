@@ -147,3 +147,20 @@ describe('the recycle bin and pay', () => {
     assert.equal(refused.body.error.details.action, 'advances.record');
   });
 });
+
+describe('ids are lower-case UUIDs', () => {
+  it('refuses an old number or an upper-case id before anything else', async () => {
+    const { NO_SUCH_ID } = await import('./helpers.ts');
+    for (const bad of ['5', '0193A5C2-7D1E-7C3A-9B2F-4E8D1A6C0B55', `urn:uuid:${NO_SUCH_ID}`]) {
+      const res = await asA.admin.get(`/v1/staff/${encodeURIComponent(bad)}`);
+      assert.equal(res.status, 400, bad);
+      assert.equal(res.body.error.code, 'validation_failed');
+    }
+    assert.equal((await asA.admin.get(`/v1/staff/${NO_SUCH_ID}`)).status, 404, 'a well-formed id that names nothing');
+  });
+
+  it('refuses an id in a body that is a number', async () => {
+    const res = await asA.admin.post('/v1/advances', { staffId: 5, givenOn: '2026-09-01', amount: 100 });
+    assert.equal(res.status, 400);
+  });
+});

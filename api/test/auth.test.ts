@@ -256,7 +256,7 @@ describe('sessions end at the access token too', () => {
 
   it('refuses a token whose claims are the wrong shape', async () => {
     const { signAccessToken } = await import('../src/auth/tokens.ts');
-    const bad = signAccessToken({ sub: 1.5, sid: 'nope', client: 'managerApp', mid: null, pid: null, role: null },
+    const bad = signAccessToken({ sub: 1.5 as unknown as string, sid: 'nope', client: 'managerApp', mid: null, pid: null, role: null },
       'test-secret-test-secret-test-secret!');
     assert.equal((await new Client(h.app, bad).get('/v1/machines')).status, 401);
   });

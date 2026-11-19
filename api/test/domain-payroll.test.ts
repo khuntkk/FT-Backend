@@ -121,7 +121,7 @@ describe('money is held to the paisa', () => {
 describe('a payslip as it was paid', () => {
   it('reads back exactly, no-leave bonus apart', () => {
     const p: SalaryPayment = {
-      id: 1, staffId: 1, periodStart: '2026-03-01', periodEnd: '2026-04-01',
+      id: '1', staffId: '1', periodStart: '2026-03-01', periodEnd: '2026-04-01',
       daysWorked: 31, perDayRate: 600, stitchesInPeriod: 0,
       baseAmount: 18000, bonusAmount: 1200, noLeaveBonus: 500, salaryWasCut: true,
       advanceDeducted: 2000, otherDeductions: 0, netPayable: 17700, paidAmount: 17700,

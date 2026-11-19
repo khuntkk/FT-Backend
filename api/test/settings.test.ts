@@ -67,7 +67,7 @@ describe('settings', () => {
 
 describe('reset data', () => {
   /** One of every record Reset removes, some in the bin; returns the person's id. */
-  async function arrange(propertyId: number): Promise<number> {
+  async function arrange(propertyId: string): Promise<number> {
     const [{ id: staffId }] = await h.sql(
       `insert into staff (property_id, name, code) values ($1, 'Ramesh', '001') returning id`, [propertyId]);
     await h.sql(`insert into staff (property_id, name, deleted_at) values ($1, 'Binned', now())`, [propertyId]);
@@ -97,7 +97,7 @@ describe('reset data', () => {
     return staffId;
   }
 
-  const count = async (table: string, propertyId: number) =>
+  const count = async (table: string, propertyId: string) =>
     Number((await h.sql(`select count(*) as n from ${table} where property_id = $1`, [propertyId]))[0].n);
 
   it('is the owner\'s alone', async () => {

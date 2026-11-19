@@ -75,7 +75,7 @@ describe('files', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.purpose, 'machinePhoto');
     assert.equal(res.body.width, 3);
-    assert.match(res.body.url, /^http:\/\/.+\/files\/raw\/\d+\/[0-9a-f-]+\.png\?exp=\d+&sig=/);
+    assert.match(res.body.url, /^http:\/\/.+\/files\/raw\/[0-9a-f-]{36}\/[0-9a-f-]+\.png\?exp=\d+&sig=/);
 
     const redirect = await as.worker.get(`/v1/files/${res.body.id}`);
     assert.equal(redirect.status, 302);
@@ -113,7 +113,7 @@ describe('files', () => {
 describe('live updates', () => {
   it('tells listeners in the property which rows changed, after commit only', async () => {
     const heard: unknown[] = [];
-    const stop = h.events.listen(p.propertyId, { memberId: 0, tables: new Set(['machines']) }, (n) => heard.push(n));
+    const stop = h.events.listen(p.propertyId, { memberId: '', tables: new Set(['machines']) }, (n) => heard.push(n));
     const res = await as.admin.post('/v1/machines', { number: 41 });
     assert.deepEqual(heard, [{ table: 'machines', ids: [res.body.id] }]);
     // Refused (taken number): rolled back, so nobody hears of it.
@@ -134,7 +134,7 @@ describe('live updates', () => {
     await reader.read(); // ": connected"
     const made = await as.admin.post('/v1/machines', { number: 42 });
     const { value } = await reader.read();
-    assert.match(new TextDecoder().decode(value), new RegExp(`event: change\\ndata: \\{"table":"machines","ids":\\[${made.body.id}\\]\\}`));
+    assert.match(new TextDecoder().decode(value), new RegExp(`event: change\\ndata: \\{"table":"machines","ids":\\["${made.body.id}"\\]\\}`));
     ac.abort();
   });
 
@@ -153,7 +153,7 @@ describe('live updates', () => {
     const { value } = await reader.read();
     const text = new TextDecoder().decode(value);
     assert.doesNotMatch(text, /advances/);
-    assert.match(text, new RegExp(`"table":"machines","ids":\\[${made.body.id}\\]`));
+    assert.match(text, new RegExp(`"table":"machines","ids":\\["${made.body.id}"\\]`));
 
     const off = await as.admin.post(`/v1/users/${p.members.worker.memberId}/disable`);
     assert.equal(off.status, 200);

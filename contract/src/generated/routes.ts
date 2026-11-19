@@ -104,14 +104,14 @@ export interface ApiRoutes {
   };
   /** Change a machine. */
   "PATCH /v1/machines/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.MachinePatch;
     response: T.Machine;
   };
   /** Delete a machine and its live slips (soft). */
   "DELETE /v1/machines/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -132,7 +132,7 @@ export interface ApiRoutes {
   };
   /** One person. */
   "GET /v1/staff/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.Staff;
@@ -146,14 +146,14 @@ export interface ApiRoutes {
   };
   /** Change a person. */
   "PATCH /v1/staff/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.StaffPatch;
     response: T.Staff;
   };
   /** Delete a person, their advances and payslips (soft). */
   "DELETE /v1/staff/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -168,14 +168,14 @@ export interface ApiRoutes {
   /** Every live, active machine with its entry. */
   "GET /v1/production/day": {
     params: {  };
-    query: { date: T.DateOnly; shiftId: number };
+    query: { date: T.DateOnly; shiftId: T.Id };
     body: undefined;
     response: T.MachineDay[];
   };
   /** One machine, date and shift. */
   "GET /v1/production/entry": {
     params: {  };
-    query: { machineId: number; date: T.DateOnly; shiftId: number };
+    query: { machineId: T.Id; date: T.DateOnly; shiftId: T.Id };
     body: undefined;
     response: T.EntryWithKarigars;
   };
@@ -188,7 +188,7 @@ export interface ApiRoutes {
   };
   /** Delete a slip (soft). */
   "DELETE /v1/production/entry/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -196,21 +196,21 @@ export interface ApiRoutes {
   /** Slips in a range, paged. */
   "GET /v1/production/entries": {
     params: {  };
-    query: { from: T.DateOnly; to: T.DateOnly; shiftId?: number; staffId?: number; limit?: number; cursor?: string };
+    query: { from: T.DateOnly; to: T.DateOnly; shiftId?: T.Id; staffId?: T.Id; limit?: number; cursor?: string };
     body: undefined;
     response: T.EntryPage;
   };
   /** Totals for a range. */
   "GET /v1/production/totals": {
     params: {  };
-    query: { from: T.DateOnly; to: T.DateOnly; shiftId?: number };
+    query: { from: T.DateOnly; to: T.DateOnly; shiftId?: T.Id };
     body: undefined;
     response: T.ProductionTotals;
   };
   /** Totals per day with anything recorded. */
   "GET /v1/production/daily-totals": {
     params: {  };
-    query: { month: T.Month; shiftId?: number };
+    query: { month: T.Month; shiftId?: T.Id };
     body: undefined;
     response: Record<string, T.ProductionTotals>;
   };
@@ -237,7 +237,7 @@ export interface ApiRoutes {
   };
   /** One person's days in a range. */
   "GET /v1/staff/:id/attendance": {
-    params: { id: number };
+    params: { id: T.Id };
     query: { from: T.DateOnly; to: T.DateOnly };
     body: undefined;
     response: T.HajariDay[];
@@ -266,7 +266,7 @@ export interface ApiRoutes {
   /** A day back to unmarked (not in the bin). */
   "DELETE /v1/attendance/mark": {
     params: {  };
-    query: { staffId: number; date: T.DateOnly };
+    query: { staffId: T.Id; date: T.DateOnly };
     body: undefined;
     response: void;
   };
@@ -287,13 +287,13 @@ export interface ApiRoutes {
   /** Advances, by month or person. */
   "GET /v1/advances": {
     params: {  };
-    query: { month?: T.Month; staffId?: number };
+    query: { month?: T.Month; staffId?: T.Id };
     body: undefined;
     response: T.Advance[];
   };
   /** Owed going into a month (or now). */
   "GET /v1/staff/:id/advance-balance": {
-    params: { id: number };
+    params: { id: T.Id };
     query: { month?: T.Month };
     body: undefined;
     response: T.AdvanceBalance;
@@ -307,7 +307,7 @@ export interface ApiRoutes {
   };
   /** Delete an advance (soft). */
   "DELETE /v1/advances/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -322,7 +322,7 @@ export interface ApiRoutes {
   /** Payslips by person or year. */
   "GET /v1/payroll/payslips": {
     params: {  };
-    query: { staffId?: number; year?: number };
+    query: { staffId?: T.Id; year?: number };
     body: undefined;
     response: T.SalaryPayment[];
   };
@@ -335,7 +335,7 @@ export interface ApiRoutes {
   };
   /** Delete a payslip (soft). */
   "DELETE /v1/payroll/payslips/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -349,7 +349,7 @@ export interface ApiRoutes {
   };
   /** One rule. */
   "GET /v1/bonus-rules/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.BonusRule;
@@ -363,21 +363,21 @@ export interface ApiRoutes {
   };
   /** Replace a rule and its ladder. */
   "PUT /v1/bonus-rules/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.BonusRuleInput;
     response: T.BonusRule;
   };
   /** Switch a rule on or off. */
   "PATCH /v1/bonus-rules/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.BonusRuleToggle;
     response: T.BonusRule;
   };
   /** Delete a rule (soft). */
   "DELETE /v1/bonus-rules/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -406,13 +406,13 @@ export interface ApiRoutes {
   /** When a change to these shifts can start. */
   "GET /v1/shifts/earliest-effective-date": {
     params: {  };
-    query: { shiftIds: number[] };
+    query: { shiftIds: T.Id[] };
     body: undefined;
     response: T.DateResult;
   };
   /** Any version, retired ones included. */
   "GET /v1/shifts/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.Shift;
@@ -433,14 +433,14 @@ export interface ApiRoutes {
   };
   /** Open a new version. */
   "PATCH /v1/shifts/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.ShiftPatch;
     response: T.Shift;
   };
   /** Take a shift out of the cycle. */
   "POST /v1/shifts/:id/retire": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -468,14 +468,14 @@ export interface ApiRoutes {
   };
   /** Restore an item and what went with it. */
   "POST /v1/recycle-bin/:kind/:id/restore": {
-    params: { kind: T.DeletedKind; id: number };
+    params: { kind: T.DeletedKind; id: T.Id };
     query: {  };
     body: undefined;
     response: void;
   };
   /** Delete an item for good. */
   "DELETE /v1/recycle-bin/:kind/:id": {
-    params: { kind: T.DeletedKind; id: number };
+    params: { kind: T.DeletedKind; id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -503,49 +503,49 @@ export interface ApiRoutes {
   };
   /** Change a user's modules. */
   "PATCH /v1/users/:memberId/access": {
-    params: { memberId: number };
+    params: { memberId: T.Id };
     query: {  };
     body: T.AccessPatch;
     response: T.Member;
   };
   /** Set a temporary password. */
   "POST /v1/users/:memberId/reset-password": {
-    params: { memberId: number };
+    params: { memberId: T.Id };
     query: {  };
     body: undefined;
     response: T.TemporaryPassword;
   };
   /** Switch a user's sign-in off. */
   "POST /v1/users/:memberId/disable": {
-    params: { memberId: number };
+    params: { memberId: T.Id };
     query: {  };
     body: undefined;
     response: T.Member;
   };
   /** Switch it back on. */
   "POST /v1/users/:memberId/enable": {
-    params: { memberId: number };
+    params: { memberId: T.Id };
     query: {  };
     body: undefined;
     response: T.Member;
   };
   /** Remove a user from the unit. */
   "DELETE /v1/users/:memberId": {
-    params: { memberId: number };
+    params: { memberId: T.Id };
     query: {  };
     body: undefined;
     response: void;
   };
   /** Make a super admin (owner). */
   "POST /v1/users/:memberId/super-admin": {
-    params: { memberId: number };
+    params: { memberId: T.Id };
     query: {  };
     body: undefined;
     response: T.Member;
   };
   /** Remove a super admin (owner). */
   "DELETE /v1/users/:memberId/super-admin": {
-    params: { memberId: number };
+    params: { memberId: T.Id };
     query: {  };
     body: undefined;
     response: T.Member;
@@ -636,21 +636,21 @@ export interface ApiRoutes {
   };
   /** One property. */
   "GET /v1/platform/properties/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.PropertyDetail;
   };
   /** Change code, name, zone or machine limit; suspend or reactivate. */
   "PATCH /v1/platform/properties/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.PropertyPatch;
     response: T.Property;
   };
   /** Move ownership for an owner who has left. */
   "POST /v1/platform/properties/:id/transfer-ownership": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.TransferOwnershipInput;
     response: void;
@@ -664,42 +664,42 @@ export interface ApiRoutes {
   };
   /** One user's memberships and sessions. */
   "GET /v1/platform/users/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.PlatformUser;
   };
   /** Change a user's name, phone, email or username. */
   "PATCH /v1/platform/users/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.UserPatch;
     response: T.User;
   };
   /** Set a temporary password. */
   "POST /v1/platform/users/:id/reset-password": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.TemporaryPassword;
   };
   /** Switch a user off everywhere. */
   "POST /v1/platform/users/:id/disable": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.User;
   };
   /** Switch them back on. */
   "POST /v1/platform/users/:id/enable": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: T.User;
   };
   /** Sign a user out everywhere. */
   "DELETE /v1/platform/users/:id/sessions": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
@@ -707,7 +707,7 @@ export interface ApiRoutes {
   /** The audit log, paged. */
   "GET /v1/platform/audit": {
     params: {  };
-    query: { propertyId?: number; actorUserId?: number; from?: T.DateOnly; to?: T.DateOnly; destructive?: boolean; limit?: number; cursor?: string };
+    query: { propertyId?: T.Id; actorUserId?: T.Id; from?: T.DateOnly; to?: T.DateOnly; destructive?: boolean; limit?: number; cursor?: string };
     body: undefined;
     response: T.AuditPage;
   };
@@ -727,21 +727,21 @@ export interface ApiRoutes {
   };
   /** Change a console user's name, email or role. */
   "PATCH /v1/platform/staff/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: T.PlatformStaffPatch;
     response: T.PlatformStaffMember;
   };
   /** Remove a console user. */
   "DELETE /v1/platform/staff/:id": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;
   };
   /** Turn off a console user's two-factor sign-in, e.g. after a lost phone. */
   "DELETE /v1/platform/staff/:id/totp": {
-    params: { id: number };
+    params: { id: T.Id };
     query: {  };
     body: undefined;
     response: void;

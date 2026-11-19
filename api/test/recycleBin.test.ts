@@ -7,7 +7,7 @@ import { seedProperty, signInAll, startHarness, type Client, type Harness, type 
 let h: Harness;
 let p: SeededProperty;
 let as: Record<string, Client>;
-let dayShift: number;
+let dayShift: string;
 
 before(async () => {
   h = await startHarness();
@@ -19,17 +19,17 @@ after(() => h.close());
 
 // Arranging data with superuser SQL keeps these tests about the bin, not
 // about the modules that put things in it.
-async function machine(number: number, name: string | null = null, propertyId = p.propertyId): Promise<number> {
+async function machine(number: number, name: string | null = null, propertyId = p.propertyId): Promise<string> {
   const [{ id }] = await h.sql(`insert into machines (property_id, number, name) values ($1, $2, $3) returning id`,
     [propertyId, number, name]);
   return id;
 }
-async function person(name: string, code: string | null = null): Promise<number> {
+async function person(name: string, code: string | null = null): Promise<string> {
   const [{ id }] = await h.sql(`insert into staff (property_id, name, code) values ($1, $2, $3) returning id`,
     [p.propertyId, name, code]);
   return id;
 }
-async function slip(machineId: number, date: string, operators: number[] = []): Promise<number> {
+async function slip(machineId: string, date: string, operators: string[] = []): Promise<string> {
   const [{ id }] = await h.sql(
     `insert into production_entries (property_id, machine_id, work_date, shift_id, total_stitches)
      values ($1, $2, $3, $4, 100000) returning id`, [p.propertyId, machineId, date, dayShift]);
@@ -38,13 +38,13 @@ async function slip(machineId: number, date: string, operators: number[] = []): 
   }
   return id;
 }
-async function advance(staffId: number, amount = 500): Promise<number> {
+async function advance(staffId: string, amount = 500): Promise<string> {
   const [{ id }] = await h.sql(
     `insert into advances (property_id, staff_id, given_on, amount) values ($1, $2, '2026-09-05', $3) returning id`,
     [p.propertyId, staffId, amount]);
   return id;
 }
-async function payslip(staffId: number, month = '2026-08-01'): Promise<number> {
+async function payslip(staffId: string, month = '2026-08-01'): Promise<string> {
   const [{ id }] = await h.sql(
     `insert into salary_payments (property_id, staff_id, period_start, period_end, net_payable)
      values ($1, $2, $3::date, ($3::date + interval '1 month')::date, 9000) returning id`,
@@ -52,16 +52,16 @@ async function payslip(staffId: number, month = '2026-08-01'): Promise<number> {
   return id;
 }
 /** Soft-deletes a row in a new batch, or in the given one. Returns the batch. */
-async function softDelete(table: string, id: number, batch: string | null = null, ago = '0 seconds'): Promise<string> {
+async function softDelete(table: string, id: string, batch: string | null = null, ago = '0 seconds'): Promise<string> {
   const [row] = await h.sql(
     `update ${table} set deleted_at = now() - $3::interval, deleted_batch = coalesce($2::uuid, gen_random_uuid())
      where id = $1 returning deleted_batch`, [id, batch, ago]);
   return row.deleted_batch;
 }
-const exists = async (table: string, id: number) =>
+const exists = async (table: string, id: string) =>
   (await h.sql(`select deleted_at from ${table} where id = $1`, [id]))[0] ?? null;
 const bin = async () => (await as.admin.get('/v1/recycle-bin')).body as any[];
-const inBin = async (kind: string, id: number) => (await bin()).find((i) => i.kind === kind && i.id === id);
+const inBin = async (kind: string, id: string) => (await bin()).find((i) => i.kind === kind && i.id === id);
 const binIds = async () => (await bin()).map((i) => `${i.kind}:${i.id}`);
 
 describe('recycle bin', () => {
@@ -204,7 +204,7 @@ describe('recycle bin', () => {
 
   it('restores a cleared month as one item, named by its lowest id', async () => {
     const s = await person('Mahesh');
-    const ids: number[] = [];
+    const ids: string[] = [];
     for (const d of ['2026-09-01', '2026-09-02', '2026-09-03']) {
       const [{ id }] = await h.sql(
         `insert into attendance_marks (property_id, staff_id, work_date) values ($1, $2, $3) returning id`,

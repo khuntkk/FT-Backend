@@ -4,7 +4,15 @@
 
 // --- Primitives -------------------------------------------------------------
 
-export const id = { kind: 'integer', format: 'int64', doc: 'Server-issued id.' };
+/**
+ * A server-issued id: a lower-case, time-ordered UUID (version 7), never a
+ * number. Lower case only, so one record has exactly one spelling.
+ */
+export const id = {
+  kind: 'string', format: 'uuid', ts: 'Id',
+  pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+  doc: 'Server-issued id: a lower-case UUID.',
+};
 export const int = { kind: 'integer' };
 export const num = { kind: 'number' };
 export const bool = { kind: 'boolean' };

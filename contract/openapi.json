@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "StitchFlow API",
-    "version": "1.5.0",
+    "version": "2.0.0",
     "description": "The contract between the StitchFlow apps, the web admin panel and the API. Every operation names the permission action it needs (x-action); a destructive action is super admin only. Dates without a time are \"YYYY-MM-DD\"; instants are ISO-8601 UTC; money is rounded to the paisa. See HANDOVER.md."
   },
   "servers": [
@@ -302,9 +302,10 @@
         "description": "One customer's unit — the tenant.",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "code": {
             "type": "string",
@@ -388,9 +389,10 @@
         "description": "A person who can sign in. Never carries a password hash.",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "displayName": {
             "type": "string"
@@ -443,14 +445,16 @@
         "type": "object",
         "properties": {
           "memberId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "propertyId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "propertyCode": {
             "type": "string"
@@ -498,14 +502,16 @@
         "description": "A user's place in a property.",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "userId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "displayName": {
             "type": "string"
@@ -542,10 +548,11 @@
           },
           "staffId": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "description": "The roster row this login is, if any."
           },
           "modules": {
@@ -609,9 +616,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "number": {
             "type": "integer",
@@ -692,9 +700,10 @@
         "description": "A person on the roster. Carries pay: supervisors never receive this shape.",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "code": {
             "type": [
@@ -799,9 +808,10 @@
         "description": "A person without pay, for pickers and attendance — what a supervisor may see.",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "name": {
             "type": "string"
@@ -845,13 +855,15 @@
         "description": "One version of a shift. Editing opens a new version from a date.",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "description": "This version."
           },
           "lineageId": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "description": "The shift all its versions belong to; equals id for a first version."
           },
           "name": {
@@ -898,22 +910,25 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "machineId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "workDate": {
             "type": "string",
             "format": "date"
           },
           "shiftId": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "description": "A shift version in effect on workDate."
           },
           "totalStitches": {
@@ -1165,18 +1180,20 @@
         "description": "What to save for one machine, date and shift. Upserts.",
         "properties": {
           "machineId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "workDate": {
             "type": "string",
             "format": "date"
           },
           "shiftId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "totalStitches": {
             "type": "integer"
@@ -1244,10 +1261,11 @@
           },
           "scanId": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             "description": "The report scan that filled this slip."
           },
           "karigars": {
@@ -1277,9 +1295,10 @@
         "type": "object",
         "properties": {
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "isHalfDay": {
             "type": "boolean"
@@ -1294,9 +1313,10 @@
         "type": "object",
         "properties": {
           "machineId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "photoFileId": {
             "type": "string",
@@ -1396,9 +1416,10 @@
         "type": "object",
         "properties": {
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "date": {
             "type": "string",
@@ -1418,9 +1439,10 @@
         "type": "object",
         "properties": {
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "dates": {
             "type": "array",
@@ -1445,9 +1467,10 @@
           "staffIds": {
             "type": "array",
             "items": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           "date": {
@@ -1470,9 +1493,10 @@
           "staffIds": {
             "type": "array",
             "items": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           "date": {
@@ -1489,9 +1513,10 @@
         "type": "object",
         "properties": {
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "month": {
             "type": "string",
@@ -1507,14 +1532,16 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "givenOn": {
             "type": "string",
@@ -1553,9 +1580,10 @@
         "type": "object",
         "properties": {
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "givenOn": {
             "type": "string",
@@ -1664,14 +1692,16 @@
         "description": "A payslip: a snapshot, so a paid month stays what was paid.",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "periodStart": {
             "type": "string",
@@ -1823,9 +1853,10 @@
         "description": "Mark a month paid. The server computes the snapshot; it takes no figures from the client.",
         "properties": {
           "staffId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "month": {
             "type": "string",
@@ -1852,9 +1883,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "fromStitches": {
             "type": "integer",
@@ -1883,9 +1915,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "name": {
             "type": "string"
@@ -2070,9 +2103,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "startMinute": {
             "type": "integer",
@@ -2108,9 +2142,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "name": {
             "type": "string"
@@ -2231,9 +2266,10 @@
             "$ref": "#/components/schemas/DeletedKind"
           },
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "For attendance, the lowest id of the cleared month."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "For attendance, the first mark of the cleared month."
           },
           "deletedAt": {
             "type": "string",
@@ -2392,11 +2428,12 @@
           },
           "staffId": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
-            "description": "Server-issued id."
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           }
         },
         "required": [
@@ -2452,9 +2489,10 @@
         "type": "object",
         "properties": {
           "toMemberId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           }
         },
         "required": [
@@ -2553,9 +2591,10 @@
         "type": "object",
         "properties": {
           "memberId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           }
         },
         "required": [
@@ -2907,9 +2946,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           }
         },
         "required": [
@@ -2955,9 +2995,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "occurredAt": {
             "type": "string",
@@ -2965,27 +3006,30 @@
           },
           "propertyId": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
-            "description": "Server-issued id."
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "actorUserId": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
-            "description": "Server-issued id."
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "actorMemberId": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
-            "description": "Server-issued id."
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "actorPlatformRole": {
             "anyOf": [
@@ -3252,9 +3296,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "code": {
             "type": "string"
@@ -3349,9 +3394,10 @@
         "type": "object",
         "properties": {
           "userId": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Server-issued id."
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "description": "Server-issued id: a lower-case UUID."
           },
           "displayName": {
             "type": "string"
@@ -4056,8 +4102,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -4114,8 +4161,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -4303,8 +4351,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -4351,8 +4400,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -4409,8 +4459,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -4513,9 +4564,10 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           }
         ],
@@ -4567,9 +4619,10 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           {
@@ -4586,9 +4639,10 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           }
         ],
@@ -4684,8 +4738,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -4745,9 +4800,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           {
@@ -4755,9 +4811,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           {
@@ -4840,9 +4897,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           }
         ],
@@ -4900,9 +4958,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           }
         ],
@@ -5117,8 +5176,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           },
           {
@@ -5228,9 +5288,10 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           {
@@ -5458,9 +5519,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           }
         ],
@@ -5559,8 +5621,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           },
           {
@@ -5618,8 +5681,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -5714,9 +5778,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           {
@@ -5823,8 +5888,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -5955,8 +6021,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6003,8 +6070,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6061,8 +6129,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6119,8 +6188,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6350,9 +6420,10 @@
             "schema": {
               "type": "array",
               "items": {
-                "type": "integer",
-                "format": "int64",
-                "description": "Server-issued id."
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "description": "Server-issued id: a lower-case UUID."
               }
             }
           }
@@ -6402,8 +6473,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6450,8 +6522,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6562,8 +6635,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6789,8 +6863,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6840,8 +6915,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -6972,8 +7048,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7032,8 +7109,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7082,8 +7160,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7132,8 +7211,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7182,8 +7262,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7225,8 +7306,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7273,8 +7355,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7840,8 +7923,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7886,8 +7970,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -7944,8 +8029,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8045,8 +8131,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8091,8 +8178,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8149,8 +8237,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8197,8 +8286,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8245,8 +8335,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8293,8 +8384,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8334,9 +8426,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           {
@@ -8344,9 +8437,10 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "description": "Server-issued id."
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "description": "Server-issued id: a lower-case UUID."
             }
           },
           {
@@ -8520,8 +8614,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8576,8 +8671,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],
@@ -8617,8 +8713,9 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
             }
           }
         ],

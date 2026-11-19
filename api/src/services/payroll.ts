@@ -5,7 +5,7 @@
 // is read back from its payslip, never recomputed: attendance corrected or a
 // salary raised afterwards must not move what was handed over.
 
-import type { Month, PayrollRow, PayslipInput, SalaryBreakdown, SalaryPayment, Staff } from '@stitchflow/contract';
+import type { Id, Month, PayrollRow, PayslipInput, SalaryBreakdown, SalaryPayment, Staff } from '@stitchflow/contract';
 import { monthRange, roundMoney } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { invalid, notFound } from '../http/errors.ts';
@@ -31,7 +31,7 @@ interface Inputs {
   stitches: number;
   advanceOutstanding: number;
   advanceGiven: number;
-  paymentId: number | null;
+  paymentId: Id | null;
   noLeaveBonusAmount: number;
 }
 
@@ -40,13 +40,13 @@ const INPUT_COLUMNS = `
   i.stitches, i.advance_outstanding as "advanceOutstanding", i.advance_given as "advanceGiven",
   i.payment_id as "paymentId", ps.no_leave_bonus_amount as "noLeaveBonusAmount"`;
 
-async function inputs(tx: Tx, member: Member, month: Month, staffId: number | null): Promise<Inputs[]> {
+async function inputs(tx: Tx, member: Member, month: Month, staffId: Id | null): Promise<Inputs[]> {
   const rows = await tx.rows<Omit<Inputs, 'staff'> & Staff>(
     `select ${STAFF_COLUMNS}, ${INPUT_COLUMNS}
      from fn_payroll_inputs($1, $2::date) i
      join staff s on s.id = i.staff_id
      cross join property_settings ps
-     where $3::bigint is null or i.staff_id = $3
+     where $3::uuid is null or i.staff_id = $3
      order by s.name, s.id`,
     [member.propertyId, monthRange(month).start, staffId],
   );
@@ -78,7 +78,7 @@ export async function preview(tx: Tx, member: Member, month: Month): Promise<Pay
   const people = await inputs(tx, member, month, null);
   const ids = people.map((i) => i.paymentId).filter((id) => id !== null);
   const payments = new Map(
-    (await tx.rows<SalaryPayment>(`select ${PAYMENT_COLUMNS} from salary_payments p where p.id = any($1::bigint[])`, [ids]))
+    (await tx.rows<SalaryPayment>(`select ${PAYMENT_COLUMNS} from salary_payments p where p.id = any($1::uuid[])`, [ids]))
       .map((p) => [p.staffId, p]),
   );
   return people.map((i) => {
@@ -97,25 +97,25 @@ export async function preview(tx: Tx, member: Member, month: Month): Promise<Pay
   });
 }
 
-export function list(tx: Tx, filter: { staffId?: number; year?: number }): Promise<SalaryPayment[]> {
+export function list(tx: Tx, filter: { staffId?: Id; year?: number }): Promise<SalaryPayment[]> {
   return tx.rows<SalaryPayment>(
     `select ${PAYMENT_COLUMNS} from salary_payments p
      where p.deleted_at is null
-       and ($1::bigint is null or p.staff_id = $1)
+       and ($1::uuid is null or p.staff_id = $1)
        and ($2::int is null or extract(year from p.period_start) = $2)
      order by p.period_start desc, p.id desc`,
     [filter.staffId ?? null, filter.year ?? null],
   );
 }
 
-export async function get(tx: Tx, id: number): Promise<SalaryPayment> {
+export async function get(tx: Tx, id: Id): Promise<SalaryPayment> {
   const p = await tx.one<SalaryPayment>(
     `select ${PAYMENT_COLUMNS} from salary_payments p where p.id = $1 and p.deleted_at is null`, [id]);
   if (!p) throw notFound('No such payslip.');
   return p;
 }
 
-const livePayslip = (tx: Tx, staffId: number, periodStart: string) =>
+const livePayslip = (tx: Tx, staffId: Id, periodStart: string) =>
   tx.one<SalaryPayment>(
     `select ${PAYMENT_COLUMNS} from salary_payments p
      where p.staff_id = $1 and p.period_start = $2 and p.deleted_at is null`,
@@ -142,7 +142,7 @@ export async function markPaid(tx: Tx, member: Member, input: PayslipInput): Pro
     throw invalid({ staffId: 'inactive' }, 'Only an active person is paid.');
   }
   const b = workOut(i, otherDeductions);
-  const row = await tx.one<{ id: number }>(
+  const row = await tx.one<{ id: Id }>(
     `insert into salary_payments (
        property_id, staff_id, period_start, period_end, days_worked, per_day_rate, stitches_in_period,
        base_amount, bonus_amount, no_leave_bonus, salary_was_cut, advance_deducted, other_deductions,
@@ -161,7 +161,7 @@ export async function markPaid(tx: Tx, member: Member, input: PayslipInput): Pro
  * Soft delete. The advance it recovered is owed again by itself: the balance
  * is derived. No batch, as for an advance (services/advances.ts remove).
  */
-export async function remove(tx: Tx, member: Member, id: number): Promise<SalaryPayment> {
+export async function remove(tx: Tx, member: Member, id: Id): Promise<SalaryPayment> {
   const before = await get(tx, id);
   await tx.exec(
     `update salary_payments set deleted_at = now(), deleted_by_member_id = $2, updated_by_member_id = $2

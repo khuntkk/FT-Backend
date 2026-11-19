@@ -52,7 +52,7 @@ const result = (amount: number, reason: BonusReason, more: Partial<BonusResult> 
  * 1. A second-machine ("stitch based") entry is paid at the per-1,000 rate
  *    from settings, in place of any rule.
  * 2. Otherwise the first active rule whose condition matches the shift pays,
- *    by sort order (then id, the order the rules are listed in).
+ *    by sort order (then the older rule: ids are time-ordered, the order the rules are listed in).
  * 3. Failing both, nothing.
  */
 export function calculateEntryBonus(
@@ -73,7 +73,9 @@ export function calculateEntryBonus(
   const condition = conditionOf(input);
   const rule = rules
     .filter((r) => r.isActive && r.condition === condition)
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)[0];
+    // Ties on sort order go to the older rule: ids are time-ordered UUIDs, so
+    // comparing them as text is comparing when they were made.
+    .sort((a, b) => a.sortOrder - b.sortOrder || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
   if (!rule) return result(0, { type: 'noMatchingRule', condition });
 
   if (rule.kind === 'perFrame') {

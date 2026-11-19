@@ -4,6 +4,7 @@
 // A code is unique among live people (index staff_live_code); a code freed
 // by a deleted person may be used again.
 
+import type { Id } from '@stitchflow/contract';
 import { roundMoney, type NextCode, type Person, type Staff, type StaffCategory, type StaffInput, type StaffPatch }
   from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
@@ -32,7 +33,7 @@ export function operators(tx: Tx, activeOnly = false): Promise<Person[]> {
   );
 }
 
-export async function get(tx: Tx, id: number): Promise<Staff> {
+export async function get(tx: Tx, id: Id): Promise<Staff> {
   const s = await tx.one<Staff>(
     `select ${STAFF_COLUMNS} from staff s where s.id = $1 and s.deleted_at is null`, [id]);
   if (!s) throw notFound('No such person.');
@@ -82,7 +83,7 @@ export async function create(tx: Tx, member: Member, input: StaffInput): Promise
   const f = fields(input);
   const columns = ['property_id', 'created_by_member_id', 'updated_by_member_id', ...f.map(([c]) => c)];
   const values = [member.propertyId, member.memberId, member.memberId, ...f.map(([, v]) => v)];
-  const row = await onConstraint(tx.one<{ id: number }>(
+  const row = await onConstraint(tx.one<{ id: Id }>(
     `insert into staff (${columns.join(', ')})
      values (${values.map((_, i) => `$${i + 1}`).join(', ')}) returning id`,
     values,
@@ -90,7 +91,7 @@ export async function create(tx: Tx, member: Member, input: StaffInput): Promise
   return get(tx, row!.id);
 }
 
-export async function update(tx: Tx, member: Member, id: number, patch: StaffPatch): Promise<Staff> {
+export async function update(tx: Tx, member: Member, id: Id, patch: StaffPatch): Promise<Staff> {
   const f = fields(patch);
   const values: unknown[] = [id, member.memberId, ...f.map(([, v]) => v)];
   const sets = [...f.map(([c], i) => `${c} = $${i + 3}`), 'updated_by_member_id = $2'];
@@ -107,7 +108,7 @@ export async function update(tx: Tx, member: Member, id: number, patch: StaffPat
  * batch. Slips they ran are left alone: the work still happened. Returns the
  * person as they were.
  */
-export async function remove(tx: Tx, member: Member, id: number): Promise<Staff> {
+export async function remove(tx: Tx, member: Member, id: Id): Promise<Staff> {
   const before = await get(tx, id);
   const batch = await tx.one<{ batch: string }>(
     `update staff set deleted_at = now(), deleted_by_member_id = $2, deleted_batch = gen_random_uuid()

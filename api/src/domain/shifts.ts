@@ -1,6 +1,7 @@
 // Shift rules, ported from packages/sf_core/lib/src/domain/shift_schedule.dart
 // in the apps repo. Pure functions: no database.
 
+import type { Id } from '@stitchflow/contract';
 import { addDays, type ShiftProblem, type ShiftScheme } from '@stitchflow/contract';
 
 /** Minutes in a day. */
@@ -157,7 +158,7 @@ export const shiftCycleClashes = (shifts: CycleShift[]): boolean =>
 
 export interface SmartAdjustPlan {
   /** The new timings, in the order they will run. */
-  shifts: { id: number; name: string; startMinute: number; durationMinutes: number }[];
+  shifts: { id: Id; name: string; startMinute: number; durationMinutes: number }[];
   /** exact: equal lengths that fit the day; needsReview: only the user knows if it is what they meant. */
   confidence: 'exact' | 'needsReview';
   /** The shifts added up to more than a day and each was cut to eachMinutes. */
@@ -183,7 +184,7 @@ function plannedLengths(cycle: CycleShift[], total: number): { lengths: number[]
  * How to lay clashing shifts out cleanly: keep the cycle's start and running
  * order, place each directly after the last. Null when nothing needs fixing.
  */
-export function planSmartAdjust<T extends CycleShift & { id: number }>(shifts: T[]): SmartAdjustPlan | null {
+export function planSmartAdjust<T extends CycleShift & { id: Id }>(shifts: T[]): SmartAdjustPlan | null {
   if (!shifts.length || !validateShiftCycle(shifts).length) return null;
   const cycle = orderedCycle(shifts);
   const total = cycle.reduce((sum, s) => sum + s.durationMinutes, 0);

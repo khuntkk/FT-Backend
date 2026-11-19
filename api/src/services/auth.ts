@@ -5,9 +5,7 @@
 // family; presenting a token that was already rotated away means it was
 // copied, so the whole family is revoked.
 
-import type {
-  ClientKind, LoginInput, LoginResult, Membership, PlatformLoginInput, PlatformRole, TokenPair, UserRole,
-} from '@stitchflow/contract';
+import type { ClientKind, Id, LoginInput, LoginResult, Membership, PlatformLoginInput, PlatformRole, TokenPair, UserRole } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 import { ApiError } from '../http/errors.ts';
 import { checkPassword, hashPassword, passwordProblem } from '../auth/passwords.ts';
@@ -24,8 +22,8 @@ const SESSION_DAYS = 7;
 const KEEP_SIGNED_IN_DAYS = 15;
 
 interface MembershipRow {
-  member_id: number;
-  property_id: number;
+  member_id: Id;
+  property_id: Id;
   property_code: string;
   property_name: string;
   property_status: string;
@@ -48,12 +46,12 @@ const usable = (r: MembershipRow) => r.status === 'active' && r.property_status 
 
 // fn_user_memberships is security definer: memberships are hidden by
 // row-level security until a property is chosen.
-const memberships = (tx: Tx, userId: number) =>
+const memberships = (tx: Tx, userId: Id) =>
   tx.rows<MembershipRow>(`select * from fn_user_memberships($1)`, [userId]);
 
 interface SessionSpec {
-  userId: number;
-  memberId: number | null;
+  userId: Id;
+  memberId: Id | null;
   client: ClientKind;
   keepSignedIn: boolean;
   familyId?: string;
@@ -95,7 +93,7 @@ const memberClaims = (m: MembershipRow | null) => ({
 async function authenticate(tx: Tx, column: string, identifier: string, password: string, ip: string) {
   assertSignInInputSize(identifier, password);
   const keys = signInKeys(column, identifier, ip);
-  const u = await tx.one<{ id: number; password_hash: string | null; status: string }>(
+  const u = await tx.one<{ id: Id; password_hash: string | null; status: string }>(
     `select id, password_hash, status from users where ${column} = $1`,
     [identifier],
   );
@@ -154,7 +152,7 @@ export async function platformLogin(
     { mid: null, pid: null, role: null, prole: staff.role });
 }
 
-export async function selectProperty(tx: Tx, secret: string, claims: AccessClaims, memberId: number) {
+export async function selectProperty(tx: Tx, secret: string, claims: AccessClaims, memberId: Id) {
   const m = (await memberships(tx, claims.sub)).find((r) => r.member_id === memberId);
   if (!m) throw new ApiError('not_found', 'No such membership.');
   if (m.property_status !== 'active') throw new ApiError('property_suspended', 'This unit is not active.');
@@ -173,7 +171,7 @@ export async function selectProperty(tx: Tx, secret: string, claims: AccessClaim
 }
 
 interface SessionRow {
-  id: string; user_id: number; member_id: number | null; client: ClientKind; family_id: string;
+  id: string; user_id: Id; member_id: Id | null; client: ClientKind; family_id: string;
   keep_signed_in: boolean; device_label: string | null; revoked_at: string | null;
   revoked_reason: string | null; expired: boolean; user_status: string; recent: boolean;
 }
@@ -247,7 +245,7 @@ const revokeFamily = (tx: Tx, familyId: string, reason: string) =>
   tx.exec(`update auth_sessions set revoked_at = now(), revoked_reason = $2
            where family_id = $1 and revoked_at is null`, [familyId, reason]);
 
-export async function logout(tx: Tx, userId: number, refreshToken: string, everywhere: boolean): Promise<void> {
+export async function logout(tx: Tx, userId: Id, refreshToken: string, everywhere: boolean): Promise<void> {
   if (everywhere) {
     await revokeUserSessions(tx, userId, 'logout');
     return;
@@ -260,16 +258,16 @@ export async function logout(tx: Tx, userId: number, refreshToken: string, every
 }
 
 /** Ends every live session of a user (disable, sign out everywhere). */
-export const revokeUserSessions = (tx: Tx, userId: number, reason: string) =>
+export const revokeUserSessions = (tx: Tx, userId: Id, reason: string) =>
   tx.exec(`update auth_sessions set revoked_at = now(), revoked_reason = $2
            where user_id = $1 and revoked_at is null`, [userId, reason]);
 
 /** Ends every live session acting as a member (disable, remove). */
-export const revokeMemberSessions = (tx: Tx, memberId: number, reason: string) =>
+export const revokeMemberSessions = (tx: Tx, memberId: Id, reason: string) =>
   tx.exec(`update auth_sessions set revoked_at = now(), revoked_reason = $2
            where member_id = $1 and revoked_at is null`, [memberId, reason]);
 
-export async function changePassword(tx: Tx, userId: number, sid: string, current: string, next: string): Promise<void> {
+export async function changePassword(tx: Tx, userId: Id, sid: string, current: string, next: string): Promise<void> {
   const u = await tx.one<{ password_hash: string | null }>(`select password_hash from users where id = $1`, [userId]);
   if (!(await checkPassword(u?.password_hash ?? null, current))) {
     throw new ApiError('validation_failed', 'The current password is wrong.', {

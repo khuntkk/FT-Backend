@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { isId } from '@stitchflow/contract';
 import { after, before, describe, it } from 'node:test';
 import { seedProperty, signInAll, startHarness, type Client, type Harness, type SeededProperty } from './helpers.ts';
 
@@ -18,7 +19,7 @@ describe('machines', () => {
     const res = await as.admin.post('/v1/machines', { number: 3, name: 'Tajima' });
     assert.equal(res.status, 200);
     assert.equal(res.body.number, 3);
-    assert.equal(typeof res.body.id, 'number');
+    assert.ok(isId(res.body.id), `a UUID id, got ${res.body.id}`);
     assert.match(res.body.createdAt, /Z$/);
     const list = await as.supervisor.get('/v1/machines');
     assert.deepEqual(list.body.map((m: any) => m.number), [3]);

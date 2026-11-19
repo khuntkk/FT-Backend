@@ -2,7 +2,7 @@
 // Member looks the same from every endpoint. Each is a fragment for
 // `select <fragment> from <table> <alias>`.
 
-import type { Me, Member, Property, PropertySettings, User } from '@stitchflow/contract';
+import type { Id, Me, Member, Property, PropertySettings, User } from '@stitchflow/contract';
 import type { Tx } from '../db/db.ts';
 
 /** From users u. */
@@ -36,22 +36,22 @@ export const SETTINGS_COLUMNS = `
   s.no_leave_bonus_amount as "noLeaveBonusAmount", s.stitch_based_enabled as "stitchBasedEnabled",
   s.stitch_based_rate_per_thousand as "stitchBasedRatePerThousand", p.timezone`;
 
-export async function getMember(tx: Tx, memberId: number): Promise<Member | undefined> {
+export async function getMember(tx: Tx, memberId: Id): Promise<Member | undefined> {
   return tx.one<Member>(
     `select ${MEMBER_COLUMNS} from property_members m join users u on u.id = m.user_id where m.id = $1`,
     [memberId],
   );
 }
 
-export async function getUser(tx: Tx, userId: number): Promise<User | undefined> {
+export async function getUser(tx: Tx, userId: Id): Promise<User | undefined> {
   return tx.one<User>(`select ${USER_COLUMNS} from users u where u.id = $1`, [userId]);
 }
 
-export async function getProperty(tx: Tx, propertyId: number): Promise<Property | undefined> {
+export async function getProperty(tx: Tx, propertyId: Id): Promise<Property | undefined> {
   return tx.one<Property>(`select ${PROPERTY_COLUMNS} from properties p where p.id = $1`, [propertyId]);
 }
 
-export async function getSettings(tx: Tx, propertyId: number): Promise<PropertySettings | undefined> {
+export async function getSettings(tx: Tx, propertyId: Id): Promise<PropertySettings | undefined> {
   return tx.one<PropertySettings>(
     `select ${SETTINGS_COLUMNS} from property_settings s join properties p on p.id = s.property_id
      where s.property_id = $1`,
@@ -59,8 +59,8 @@ export async function getSettings(tx: Tx, propertyId: number): Promise<PropertyS
   );
 }
 
-// Inside row_to_json the type parsers do not apply: ids and money are already JSON
-// numbers, but an instant is text like 2026-01-01T10:00:00.5+00:00. Normalise to
+// Inside row_to_json the type parsers do not apply: ids are already JSON strings
+// and money JSON numbers, but an instant is text like 2026-01-01T10:00:00.5+00:00. Normalise to
 // the "…Z" form PARSERS gives everywhere else.
 const iso = (v: unknown) => (typeof v === 'string' ? new Date(v).toISOString() : v);
 
@@ -71,7 +71,7 @@ const MASKED_SETTINGS_COLUMNS = SETTINGS_COLUMNS
   .replace('s.stitch_based_rate_per_thousand as', `case when ${SEES_RATES} then s.stitch_based_rate_per_thousand end as`);
 
 /** GET /v1/me in one statement: user, member, property and settings. */
-export async function getMe(tx: Tx, userId: number, memberId: number, propertyId: number): Promise<Me> {
+export async function getMe(tx: Tx, userId: Id, memberId: Id, propertyId: Id): Promise<Me> {
   const r = (await tx.one<{ user: any; member: any; property: any; settings: any }>(
     `select
        (select row_to_json(t) from (select ${USER_COLUMNS} from users u where u.id = $1) t) as "user",

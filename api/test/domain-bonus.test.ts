@@ -10,13 +10,13 @@ import {
 
 function rule(over: Partial<BonusRule> = {}, slabs: BonusSlab[] = []): BonusRule {
   return {
-    id: 1, name: 'Full head', isActive: true, condition: 'fullHead', kind: 'perThousandSlab',
+    id: '1', name: 'Full head', isActive: true, condition: 'fullHead', kind: 'perThousandSlab',
     flatAmount: 0, ratePerFrame: 0, sortOrder: 0, slabs, ...over,
   };
 }
 
 const slab = (from: number, to: number | null, value: number, id = 1): BonusSlab =>
-  ({ id, fromStitches: from, toStitches: to, value });
+  ({ id: String(id), fromStitches: from, toStitches: to, value });
 
 /** The seeded ladder: 1.0 under 100k, 1.5 to 200k, 2.0 above. */
 const ladder = () => [slab(0, 100000, 1.0, 1), slab(100000, 200000, 1.5, 2), slab(200000, null, 2.0, 3)];
@@ -96,8 +96,8 @@ describe('per frame', () => {
 });
 
 describe('choosing a rule', () => {
-  const fullHead = rule({ id: 1, name: 'Full head', condition: 'fullHead' }, ladder());
-  const headLoss = rule({ id: 2, name: 'Head loss', condition: 'headLoss', kind: 'fixedSlab' }, [slab(0, null, 80)]);
+  const fullHead = rule({ id: '1', name: 'Full head', condition: 'fullHead' }, ladder());
+  const headLoss = rule({ id: '2', name: 'Head loss', condition: 'headLoss', kind: 'fixedSlab' }, [slab(0, null, 80)]);
 
   it('an untouched entry is paid by the full-head rule', () => {
     const r = calculateEntryBonus(input({ stitches: 180000 }), [fullHead, headLoss]);
@@ -124,8 +124,8 @@ describe('choosing a rule', () => {
   });
 
   it('sort order breaks a tie between two matching rules', () => {
-    const second = rule({ id: 9, name: 'Second', sortOrder: 1, kind: 'fixedSlab' }, [slab(0, null, 999)]);
-    const first = rule({ id: 8, name: 'First', sortOrder: 0 }, ladder());
+    const second = rule({ id: '9', name: 'Second', sortOrder: 1, kind: 'fixedSlab' }, [slab(0, null, 999)]);
+    const first = rule({ id: '8', name: 'First', sortOrder: 0 }, ladder());
     // Deliberately passed lowest-priority first.
     const r = calculateEntryBonus(input({ stitches: 180000 }), [second, first]);
     assert.equal(r.rule?.name, 'First');

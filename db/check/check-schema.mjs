@@ -55,6 +55,32 @@ for (const f of readdirSync(join(root, 'views')).filter((f) => f.endsWith('.sql'
 ok(true, 'applied');
 
 // ---------------------------------------------------------------------------
+section('ids: time-ordered UUIDs everywhere');
+// 0010: every id is a version 7 UUID made by the database, in creation order;
+// nothing takes or returns the old bigint ids.
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+{
+  const ids = (await db.query(`select fn_uuid_v7()::text as id from generate_series(1, 200)`)).rows.map((r) => r.id);
+  ok(ids.every((id) => UUID_V7.test(id)), 'fn_uuid_v7() makes lower-case version 7 UUIDs');
+  ok(new Set(ids).size === ids.length, 'and no two alike');
+  ok(ids.every((id, i) => i === 0 || id > ids[i - 1]), 'in the order they were made');
+  const bigint = (await db.query(`select table_name || '.' || column_name as c from information_schema.columns
+    where table_schema = 'public' and data_type = 'bigint'
+      and table_name in (select table_name from information_schema.tables
+                         where table_schema = 'public' and table_type = 'BASE TABLE')
+    order by 1`)).rows.map((r) => r.c);
+  ok(JSON.stringify(bigint) === JSON.stringify([
+    'bonus_slabs.from_stitches', 'bonus_slabs.to_stitches', 'platform_staff.totp_last_step',
+    'production_entries.design_stitches', 'production_entries.total_stitches',
+    'salary_payments.stitches_in_period']), `only stitch counts and the TOTP step stay bigint (got ${bigint})`);
+  ok(Number(await val(`select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace
+    and 20::oid = any (p.proargtypes::oid[])
+    and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`)) === 0,
+    'no function of ours takes a bigint id');
+  ok(Number(await val(`select count(*) from information_schema.columns where table_schema = 'public'
+    and is_identity = 'YES'`)) === 0, 'no identity columns are left');
+}
+
 section('fixtures: two properties, one member of each role');
 const A = await val(`insert into properties (code, name, machine_limit) values ('janki', 'Janki Creation', 50) returning id`);
 const B = await val(`insert into properties (code, name, machine_limit) values ('other-unit', 'Other Unit', 50) returning id`);
@@ -148,6 +174,7 @@ await rejects(`insert into machines (property_id, number) values ($1, 3)`, [A], 
   /machines_live_number/);
 await db.query(`update machines set deleted_at = now() where id = $1`, [m3]);
 const m3b = await machine(A, 3);
+// Ids are time-ordered UUIDs: the newer machine sorts after the older one.
 ok(m3b > m3, 'a number in the bin can be used again');
 ok(await machine(B, 1), 'another property has its own machine 1');
 
@@ -254,11 +281,11 @@ await db.query(`update machines set deleted_at = now(), deleted_batch = $2 where
 await db.query(`update production_entries set deleted_at = now(), deleted_batch = $2
                 where machine_id = $1 and deleted_at is null`, [m3b, batch]);
 const bin = (await db.query(`select kind, id, child_count from vw_recycle_bin where property_id = $1 order by kind, id`, [A])).rows;
-const machineRow = bin.find((r) => r.kind === 'machine' && Number(r.id) === Number(m3b));
+const machineRow = bin.find((r) => r.kind === 'machine' && r.id === m3b);
 ok(machineRow?.child_count === 2, `a machine folds in the slips deleted with it (got ${machineRow?.child_count})`);
-ok(bin.some((r) => r.kind === 'productionEntry' && Number(r.id) === Number(e5)),
+ok(bin.some((r) => r.kind === 'productionEntry' && r.id === e5),
   'a slip deleted on its own is listed on its own');
-ok(bin.some((r) => r.kind === 'machine' && Number(r.id) === Number(m3)), 'the older machine 3 is there too');
+ok(bin.some((r) => r.kind === 'machine' && r.id === m3), 'the older machine 3 is there too');
 // As the API deletes: a batch of its own, under a machine that is still live.
 const m4 = await machine(A, 4);
 const e6 = await entry(m4, '2026-09-14', day2);
@@ -348,8 +375,8 @@ const otherOwnerUser = await val(`select user_id from property_members where id 
 await db.exec(`set role stitchflow_api`);
 ok(Number(await val(`select count(*) from machines`)) === 0, 'no property set: no rows at all');
 await db.exec(`set app.property_id = '${A}'`);
-const visible = (await db.query(`select distinct property_id from machines`)).rows.map((r) => Number(r.property_id));
-ok(visible.length === 1 && visible[0] === Number(A), 'only its own property\'s machines');
+const visible = (await db.query(`select distinct property_id from machines`)).rows.map((r) => r.property_id);
+ok(visible.length === 1 && visible[0] === A, 'only its own property\'s machines');
 await rejects(`insert into machines (property_id, number) values ($1, 50)`, [B],
   'writing into another property', /row-level security/);
 await rejects(`update audit_log set action = 'x'`, [], 'rewriting the audit log', /permission denied/);
@@ -359,14 +386,18 @@ await rejects(`update properties set machine_limit = 999 where id = $1`, [A],
   'a unit raising its own machine limit', /permission denied/);
 ok(await machine(A, 60), 'the API adds a machine within its limit');
 const allowances = (await db.query(`select property_id from vw_machine_allowance`)).rows;
-ok(allowances.length === 1 && Number(allowances[0].property_id) === Number(A), 'its own allowance only');
+ok(allowances.length === 1 && allowances[0].property_id === A, 'its own allowance only');
 for (const v of ['vw_recycle_bin', 'vw_member_access', 'vw_attendance_days']) {
   ok(Number(await val(`select count(*) from ${v} where property_id <> $1`, [A])) === 0,
     `nothing of another property through ${v}`);
 }
 const memberships = (await db.query(`select * from fn_user_memberships($1)`, [otherOwnerUser])).rows;
-ok(memberships.length === 1 && Number(memberships[0].property_id) === Number(B),
+ok(memberships.length === 1 && memberships[0].property_id === B,
   'sign-in can still list a user\'s own properties');
+// A token from before the change carried a number: refused, not read as "no property".
+await db.exec(`set app.property_id = '5'`);
+await rejects(`select count(*) from machines`, [], 'an old numeric property id', /invalid input syntax for type uuid/);
+await db.exec(`set app.property_id = '${A}'`);
 await db.exec(`reset app.property_id; reset role`);
 
 section('row-level security: the platform sees every property');
